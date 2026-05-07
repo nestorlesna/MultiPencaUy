@@ -114,7 +114,7 @@ export function buildGruposIncompletosEmail(
 
       <!-- CTA -->
       <div style="text-align:center;margin:0 0 28px 0;">
-        <a href="https://pencales2026.vercel.app/fixture"
+        <a href="https://penca2026uy.vercel.app/fixture"
            style="background:#10B981;color:#0B0F1A;text-decoration:none;padding:14px 36px;
                   border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;
                   letter-spacing:0.3px;">
@@ -253,7 +253,7 @@ export function buildPartidoEmail(
 
       <!-- CTA -->
       <div style="text-align:center;margin:24px 0 0 0;">
-        <a href="https://pencales2026.vercel.app/ranking"
+        <a href="https://penca2026uy.vercel.app/ranking"
            style="background:#10B981;color:#0B0F1A;text-decoration:none;padding:12px 32px;
                   border-radius:8px;font-weight:bold;font-size:14px;display:inline-block;">
           Ver ranking completo →
@@ -285,8 +285,8 @@ export function buildRankingEmail(
 
   function rowStyle(isUser: boolean) {
     return isUser
-      ? 'background:#10B981;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;'
-      : 'background:#1E2535;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;'
+      ? 'background:#10B981;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;'
+      : 'background:#1E2535;border-radius:8px;padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;'
   }
   function nameColor(isUser: boolean) {
     return isUser ? '#0B0F1A' : '#F8FAFC'
@@ -299,11 +299,11 @@ export function buildRankingEmail(
     const pts    = entry.total_points
     return `
       <div style="${rowStyle(isUser)}">
-        <span style="font-size:18px;width:28px;flex-shrink:0;text-align:center;">${medal}</span>
-        <span style="flex:1;font-size:14px;font-weight:${isUser ? 'bold' : 'normal'};color:${nameColor(isUser)};overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">
+        <span style="font-size:18px;width:32px;flex-shrink:0;text-align:center;margin-right:10px;">${medal}</span>
+        <span style="flex:1;font-size:14px;font-weight:${isUser ? 'bold' : 'normal'};color:${nameColor(isUser)};overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-right:16px;">
           ${entry.display_name || entry.username}${isUser ? ' (vos)' : ''}
         </span>
-        <span style="font-size:14px;font-weight:bold;color:${ptColor(isUser)};flex-shrink:0;">${pts} pts</span>
+        <span style="font-size:14px;font-weight:bold;color:${ptColor(isUser)};flex-shrink:0;white-space:nowrap;">${pts} pts</span>
       </div>`
   }
 
@@ -312,7 +312,7 @@ export function buildRankingEmail(
   const userSection = (!userInTop5 && userEntry)
     ? `
       <div style="border-top:1px dashed #1E2535;margin:16px 0 10px 0;padding-top:4px;"></div>
-      <p style="color:#94A3B8;font-size:11px;text-align:center;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;">Tu posición</p>
+      <p style="color:#94A3B8;font-size:11px;text-align:center;margin:0 0 8px 0;text-transform:uppercase;letter-spacing:0.5px;">Tu posición — puesto ${userEntry.rank} de ${totalParticipants}</p>
       ${entryRow(userEntry, null, true)}`
     : (!userInTop5 && !userEntry)
       ? `
@@ -352,7 +352,7 @@ export function buildRankingEmail(
 
       <!-- CTA -->
       <div style="text-align:center;margin:28px 0 0 0;">
-        <a href="https://pencales2026.vercel.app/ranking"
+        <a href="https://penca2026uy.vercel.app/ranking"
            style="background:#10B981;color:#0B0F1A;text-decoration:none;padding:14px 36px;
                   border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;">
           Ver ranking completo →
@@ -405,7 +405,7 @@ export function buildNoApuestasEmail(displayName: string): string {
 
       <!-- CTA -->
       <div style="text-align:center;margin:0 0 28px 0;">
-        <a href="https://pencales2026.vercel.app/mis-predicciones"
+        <a href="https://penca2026uy.vercel.app/mis-predicciones"
            style="background:#10B981;color:#0B0F1A;text-decoration:none;padding:14px 36px;
                   border-radius:8px;font-weight:bold;font-size:15px;display:inline-block;
                   letter-spacing:0.3px;">
