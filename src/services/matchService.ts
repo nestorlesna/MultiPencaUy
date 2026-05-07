@@ -59,6 +59,37 @@ export async function fetchMatchByNumber(matchNumber: number): Promise<MatchWith
   return data as unknown as MatchWithRelations
 }
 
+export async function fetchMatchCount(): Promise<number> {
+  const { data, error } = await supabase.from('matches').select('id')
+  if (error) throw error
+  return data?.length ?? 0
+}
+
+export interface MatchPredictionDetail {
+  user_id: string
+  display_name: string
+  username: string
+  home_score: number | null
+  away_score: number | null
+  points_earned: number
+  total_points: number
+}
+
+export async function fetchMatchPredictionsAdmin(matchId: string): Promise<MatchPredictionDetail[]> {
+  const { data, error } = await supabase.rpc('admin_get_match_predictions', { p_match_id: matchId })
+  if (error) throw error
+  return (data ?? []) as MatchPredictionDetail[]
+}
+
+export async function fetchGroupMatchCount(): Promise<number> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('id')
+    .not('group_id', 'is', null)
+  if (error) throw error
+  return data?.length ?? 0
+}
+
 export async function fetchStadium(id: string) {
   const { data, error } = await supabase
     .from('stadiums')

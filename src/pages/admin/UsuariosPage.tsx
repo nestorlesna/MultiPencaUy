@@ -4,6 +4,7 @@ import { Loader2, ShieldCheck, ShieldOff, UserCheck, UserX, Search, ClipboardLis
 import { toast } from 'sonner'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { fetchAllProfiles, fetchAdminUserDetails, setUserActive, setUserAdmin, setUserLoader } from '../../services/profileService'
+import { fetchMatchCount } from '../../services/matchService'
 import type { AdminUserDetail } from '../../services/profileService'
 import { useAuth } from '../../hooks/useAuth'
 import type { Profile } from '../../types'
@@ -29,6 +30,11 @@ function UsuariosContent() {
   const { data: userDetails } = useQuery({
     queryKey: ['admin_user_details'],
     queryFn: fetchAdminUserDetails,
+  })
+
+  const { data: totalMatches } = useQuery({
+    queryKey: ['match_count'],
+    queryFn: fetchMatchCount,
   })
 
   const detailsMap = new Map<string, AdminUserDetail>(
@@ -103,6 +109,7 @@ function UsuariosContent() {
               key={profile.id}
               profile={profile}
               detail={detailsMap.get(profile.id)}
+              totalMatches={totalMatches ?? 0}
               isMe={profile.id === me?.id}
               onToggleActive={(val) => {
                 mutateActive.mutate({ id: profile.id, val })
@@ -127,13 +134,14 @@ function UsuariosContent() {
 interface UserRowProps {
   profile: Profile
   detail?: AdminUserDetail
+  totalMatches: number
   isMe: boolean
   onToggleActive: (val: boolean) => void
   onToggleAdmin: (val: boolean) => void
   onToggleLoader: (val: boolean) => void
 }
 
-function UserRow({ profile, detail, isMe, onToggleActive, onToggleAdmin, onToggleLoader }: UserRowProps) {
+function UserRow({ profile, detail, totalMatches, isMe, onToggleActive, onToggleAdmin, onToggleLoader }: UserRowProps) {
   const initials = (profile.display_name || profile.username)[0].toUpperCase()
   const noPredictions = detail !== undefined && detail.predictions_count === 0
 
@@ -162,7 +170,11 @@ function UserRow({ profile, detail, isMe, onToggleActive, onToggleAdmin, onToggl
         )}
         {detail !== undefined && (
           <p className={`text-xs font-medium mt-0.5 ${noPredictions ? 'text-error' : 'text-text-muted'}`}>
-            {detail.predictions_count} apuesta{detail.predictions_count !== 1 ? 's' : ''}
+            {detail.predictions_count}
+            {totalMatches > 0
+              ? <span className="text-text-muted font-normal"> / {totalMatches} partidos</span>
+              : <span className="text-text-muted font-normal"> apuesta{detail.predictions_count !== 1 ? 's' : ''}</span>
+            }
             {noPredictions && ' — sin apuestas'}
           </p>
         )}

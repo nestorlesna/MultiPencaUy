@@ -7,6 +7,11 @@ export interface AdminUserDetail {
   predictions_count: number
 }
 
+export interface GroupPredictionsDetail {
+  user_id: string
+  group_preds_count: number
+}
+
 export async function updateProfile(
   userId: string,
   data: Partial<Pick<Profile, 'display_name' | 'avatar_url'>>
@@ -43,6 +48,12 @@ export async function fetchAdminUserDetails(): Promise<AdminUserDetail[]> {
   const { data, error } = await supabase.rpc('admin_get_user_details')
   if (error) throw error
   return (data ?? []) as AdminUserDetail[]
+}
+
+export async function fetchGroupPredictionsPerUser(): Promise<GroupPredictionsDetail[]> {
+  const { data, error } = await supabase.rpc('admin_get_group_predictions')
+  if (error) throw error
+  return (data ?? []) as GroupPredictionsDetail[]
 }
 
 export async function setUserActive(userId: string, isActive: boolean) {
