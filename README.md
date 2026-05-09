@@ -19,14 +19,15 @@ Aplicación web de predicciones para la Copa Mundial de Fútbol FIFA 2026. Los u
 - **Ayuda** — reglas detalladas con ejemplos dinámicos según la config activa
 
 ### Para administradores
-- **Resultados** — carga de resultados con botones +/− para 90', tiempo extra y penales; botón **"Recalcular todo"** que recalcula puntos de todos los partidos finalizados, propaga ganadores al cuadro eliminatorio y recalcula los +Puntos
+- **Resultados** — carga de resultados con botones +/− para 90', tiempo extra y penales; al guardar recalcula puntos de predicciones, propaga ganadores al cuadro eliminatorio, recalcula +Puntos, y encola automáticamente un correo por cada usuario activo; botón **"Recalcular todo"** para reprocesar todos los partidos
 - **Partidos** — edición de fecha/hora, equipos y estadio de cada partido
 - **Equipos** — edición de nombre, abreviación y bandera de cada equipo
 - **Terceros** — ranking de los 12 terceros de grupo para el armado del R32
 - **Usuarios** — aprobación y activación/desactivación de usuarios
 - **Auditoría** — historial de cambios en predicciones con filtros
 - **Configuración** — puntajes parametrizables para todos los tipos de acierto y bonus
-- **Subgrupos** — habilitar/deshabilitar o eliminar subgrupos creados por usuarios
+- **Correos** — gestión de cola de correos salientes: encolado manual por tipo (sin apuestas, grupos incompletos, ranking, partido), envío individual o masivo vía SMTP, vista previa de HTML, filtros y eliminación
+- **Resultados Auto** — consulta de solo lectura de 3 APIs externas de fútbol (football-data.org, api-football.com, thesportsdb.com) para comparar resultados y explorar datos; no modifica nada en la penca
 
 ---
 
@@ -43,7 +44,7 @@ Aplicación web de predicciones para la Copa Mundial de Fútbol FIFA 2026. Los u
 | Backend | Supabase (PostgreSQL + Auth + Storage) |
 | Toasts | Sonner |
 | Fechas | date-fns (`es` locale) |
-| Deploy | Vercel (frontend) + Supabase (backend) |
+| Deploy | Vercel (frontend + funciones serverless) + Supabase (backend) |
 
 ---
 
@@ -63,13 +64,15 @@ npm install
 
 ### 2. Variables de entorno
 
-Crear `.env.local` en la raíz:
+Crear `.env` en la raíz copiando `.env.example` y completando los valores. Las variables `VITE_*` son las mínimas para correr en desarrollo local:
 
 ```env
 VITE_SUPABASE_URL=https://<tu-proyecto>.supabase.co
 VITE_SUPABASE_ANON_KEY=<tu-anon-key>
 VITE_TURNSTILE_SITE_KEY=<tu-site-key-de-cloudflare-turnstile>
 ```
+
+Las demás variables (`SUPABASE_SERVICE_ROLE_KEY`, `SMTP_*`, claves de APIs externas) solo se necesitan para ejecutar las funciones serverless de Vercel en local. Ver sección **Despliegue** para cómo configurarlas en producción.
 
 ### 3. Inicializar base de datos
 
@@ -87,7 +90,7 @@ supabase/09_combinaciones.sql    # 495 combinaciones FIFA de mejores terceros
 supabase/10_recalculate_all.sql  # Función de recálculo global
 supabase/11_loader_role.sql      # Rol de cargador de resultados
 supabase/12_subgrupos.sql        # Tablas, RLS, funciones y vistas de subgrupos
-supabase/13_admin_functions.sql  # Funciones auxiliares para el panel de admin (email + conteo de apuestas)
+supabase/13_admin_functions.sql  # Funciones auxiliares para el panel de admin
 supabase/00_reset_init.sql       # Carga datos del torneo (grupos, equipos, partidos, etc.)
 ```
 
@@ -145,21 +148,98 @@ npm run preview  # Preview del build
 ## Flujo de cálculo de puntos
 
 ```
-Admin carga resultado
-  └─ setMatchResult()          → actualiza scores + status='finished'
-       └─ trigger auto_set_match_winner  → calcula winner_team_id
-  └─ calculateMatchPoints()    → calcula puntos de predicciones
-  └─ populate_knockout_matches() → propaga ganadores al cuadro
-  └─ calculate_bonus_points()  → recalcula +Puntos (si condiciones cumplidas)
+Admin carga resultado (Admin → Resultados)
+  └─ setMatchResult()              → actualiza scores + status='finished' en BD
+       └─ trigger auto_set_match_winner  → calcula winner_team_id automáticamente
+  └─ calculateMatchPoints()        → RPC: calcula puntos de todas las predicciones del partido
+  └─ populate_knockout_matches()   → RPC: propaga ganadores al cuadro eliminatorio (idempotente)
+  └─ calculate_bonus_points()      → RPC: recalcula +Puntos si se cumplen condiciones (idempotente)
+  └─ enqueueMatchResultEmails()    → encola 1 correo por cada usuario activo en email_queue
+                                     (omite usuarios que ya tienen correo para ese partido)
 ```
 
 Si por algún motivo los puntos no se actualizaron, el botón **"Recalcular todo"** en Admin → Resultados ejecuta `recalculate_all()` que procesa todos los partidos finalizados de una vez.
 
 ---
 
+## Sistema de correos (Admin → Correos)
+
+Los correos se gestionan mediante una cola en Supabase (`email_queue`) y se envían bajo demanda desde el panel de admin. El envío real se hace vía la función serverless `api/send-email.ts` usando SMTP.
+
+### Cola de correos (`email_queue`)
+
+Cada fila representa un correo pendiente de enviar con los campos:
+`to_email`, `to_name`, `subject`, `body_html`, `category`, `user_id`, `status` (`pending` / `sent` / `failed`), `error_message`, `sent_at`.
+
+### Tipos de correo y cuándo se generan
+
+| Categoría | Descripción | Generación |
+|-----------|-------------|------------|
+| `partido_M{N}` | Resultados del partido N con tabla de predicciones de todos y top 5 ranking | **Automática** al cargar resultado en Admin → Resultados; también disponible en Admin → Correos → "Por partido" |
+| `no_apuestas` | Recordatorio a usuarios sin ninguna apuesta cargada | Manual desde Admin → Correos |
+| `grupos_incompletos` | Recordatorio a usuarios con menos predicciones que partidos de grupo | Manual desde Admin → Correos |
+| `ranking` | Ranking actualizado con posición personalizada de cada usuario | Manual desde Admin → Correos |
+
+### Flujo de envío
+
+1. Los correos llegan a la cola con `status = 'pending'`
+2. El admin los revisa en Admin → Correos (filtros por estado, categoría, búsqueda)
+3. Presiona **Enviar** (individual o masivo)
+4. El frontend llama a `POST /api/send-email` con el `email_id` y el JWT de sesión
+5. La función serverless verifica que sea admin, obtiene el correo de la cola, envía por SMTP y actualiza el estado a `sent` o `failed`
+
+### Variables de entorno requeridas para correos
+
+Configurar en Vercel → Settings → Environment Variables:
+
+```
+SUPABASE_URL              # URL del proyecto Supabase
+SUPABASE_SERVICE_ROLE_KEY # Service role key (acceso total, solo serverless)
+SMTP_HOST                 # Servidor SMTP (ej: smtp.gmail.com)
+SMTP_PORT                 # Puerto (587 para TLS, 465 para SSL)
+SMTP_SECURE               # false para 587/TLS, true para 465/SSL
+SMTP_USER                 # Dirección de email remitente
+SMTP_PASS                 # Contraseña SMTP (para Gmail: "Contraseña de aplicación")
+SMTP_FROM_NAME            # Nombre del remitente (ej: PencaLes 2026)
+```
+
+---
+
+## APIs externas — Resultados Automáticos (Admin → Resultados Auto)
+
+Pantalla de **solo lectura** para consultar datos de partidos desde 3 APIs externas. No modifica ningún dato de la penca. Útil para comparar resultados y explorar disponibilidad de datos antes de integrarlos al flujo real.
+
+Cada API tiene su propia función serverless que actúa como proxy seguro: las claves nunca llegan al navegador.
+
+| API | Proxy serverless | Descripción |
+|-----|-----------------|-------------|
+| [football-data.org](https://www.football-data.org) | `api/football-data.ts` | REST v4 · Competiciones, partidos, posiciones, equipos |
+| [api-football.com](https://www.api-football.com) | `api/api-football.ts` | REST v3 vía api-sports.io · Fixtures, estadísticas, jugadores |
+| [thesportsdb.com](https://www.thesportsdb.com) | `api/sportsdb.ts` | REST v1 · Eventos, equipos, ligas, imágenes |
+
+Cada sección de la pantalla tiene consultas rápidas prearmadas (info de la competición, partidos por estado/fecha, equipos) y un campo libre para escribir cualquier endpoint con parámetros.
+
+### Variables de entorno requeridas
+
+Configurar en Vercel → Settings → Environment Variables:
+
+```
+FOOTBALL_DATA_API_KEY  # Key de football-data.org (registro gratuito en el sitio)
+API_FOOTBALL_KEY       # Key de api-football.com / api-sports.io (dashboard del sitio)
+SPORTSDB_API_KEY       # Key de thesportsdb.com ("3" para el plan gratuito)
+```
+
+---
+
 ## Estructura del proyecto
 
 ```
+api/                           # Funciones serverless de Vercel
+├── send-email.ts              # Envío de correos via SMTP desde la cola email_queue
+├── football-data.ts           # Proxy hacia api.football-data.org/v4
+├── api-football.ts            # Proxy hacia v3.football.api-sports.io
+└── sportsdb.ts                # Proxy hacia thesportsdb.com/api/v1/json
+
 src/
 ├── App.tsx
 ├── components/
@@ -185,17 +265,21 @@ src/
 │       ├── TercerosPage.tsx
 │       ├── UsuariosPage.tsx
 │       ├── AuditoriaPage.tsx
-│       └── ConfigPage.tsx
+│       ├── ConfigPage.tsx
+│       ├── CorreosPage.tsx    # /admin/correos — gestión de cola de correos
+│       └── ResultAutoPage.tsx # /admin/resultauto — consulta de APIs externas
 ├── services/
 │   ├── matchService.ts
 │   ├── predictionService.ts
 │   ├── bonusService.ts
 │   ├── adminService.ts
+│   ├── emailService.ts        # Cola de correos: enqueue, send, builders HTML, enqueueMatchResultEmails()
 │   ├── combinacionesService.ts
 │   ├── leaderboardService.ts
 │   ├── auditService.ts
 │   ├── teamService.ts
 │   ├── groupService.ts
+│   ├── profileService.ts
 │   └── subgrupoService.ts
 ├── hooks/                     # useAuth, usePredictions, useStandings, etc.
 ├── types/                     # Interfaces TypeScript
@@ -219,7 +303,7 @@ supabase/
 ├── 10_recalculate_all.sql     # recalculate_all() — recálculo global idempotente
 ├── 11_loader_role.sql         # Rol de cargador de resultados
 ├── 12_subgrupos.sql           # subgrupos, subgrupo_members, RLS, RPC, triggers, vistas
-└── 13_admin_functions.sql     # admin_get_user_details() — email + conteo de apuestas por usuario
+└── 13_admin_functions.sql     # admin_get_user_details(), admin_get_match_predictions(), etc.
 ```
 
 ---
@@ -227,9 +311,34 @@ supabase/
 ## Despliegue
 
 ### Vercel
+
 1. Conectar el repositorio en [vercel.com](https://vercel.com)
-2. Agregar variables de entorno: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y `VITE_TURNSTILE_SITE_KEY`
-3. Framework preset: **Vite**
+2. Framework preset: **Vite**
+3. Agregar todas las variables de entorno en **Settings → Environment Variables**:
+
+**Variables frontend (todos los entornos):**
+```
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+VITE_TURNSTILE_SITE_KEY
+```
+
+**Variables serverless (marcar como "Server" o todos los entornos):**
+```
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURE
+SMTP_USER
+SMTP_PASS
+SMTP_FROM_NAME
+FOOTBALL_DATA_API_KEY
+API_FOOTBALL_KEY
+SPORTSDB_API_KEY
+```
+
+Ver `.env.example` para descripción detallada de cada variable y cómo obtenerla.
 
 ### Supabase
 - Ejecutar los scripts SQL en orden (ver sección Setup)
@@ -441,41 +550,12 @@ git push
 2. Tag: `v1.1.0`
 3. Título: `PencaLes 2026 v1.1.0`
 4. Subir el APK como asset (arrastrar el archivo con nombre Penca2026uy.apk)
-5. Descripcion (ver mas abajo)
-6. Click en **Publish release**
+5. Click en **Publish release**
 
 A partir de ese momento, los usuarios con la versión anterior verán el modal de actualización al abrir la app.
 
 ---
 
-
------ Descripcion para Release en GitHub -------
-## 🚀 PencaLes 2026 - ¡Lanzamiento Oficial!
-Esta versión marca la primera entrega estable de la aplicación diseñada para vivir la emoción del Mundial 2026. 
-### ✨ Funcionalidades Destacadas:
-- 📅 **Fixture Completo:** Los 104 partidos cargados y listos para predecir.
-- 📊 **Tablas en Tiempo Real:** Seguimiento de grupos con criterios oficiales de desempate FIFA.
-- 🏆 **Cuadro Eliminatorio:** Visualización dinámica del bracket desde dieciseisavos hasta la Final.
-- 🥇 **Ranking Global:** Compite con todos los usuarios por el primer puesto.
-- 👥 **Subgrupos:** Crea tus propias ligas privadas con amigos o compañeros de trabajo.
-- 💎 **+ Puntos:** Apuestas especiales (Podio, Goleador, Rango de goles, etc.) para sumar puntos extra.
-- 🔄 **Actualización Automática:** La app Android verificará nuevas versiones al iniciar y permitirá instalarlas directamente.
-### 🛠️ Mejoras Técnicas:
-- Integración completa con **Supabase** para datos en tiempo real.
-- UX optimizada para dispositivos móviles mediante **Capacitor**.
-- Panel de administración avanzado para gestión de resultados y auditoría de apuestas.
----
-**Nota para la instalación en Android:**
-Descarga el archivo `Penca2026uy.apk` adjunto aquí abajo. Si es la primera vez que instalas una app fuera de la Store, recuerda habilitar el permiso de *Instalar aplicaciones de fuentes desconocidas* en los ajustes de tu teléfono.
-
-
-
-
-
-
-
 ## Licencia
 
 Proyecto privado · Todos los derechos reservados · 2025-2026
-
-

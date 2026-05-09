@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase'
 import type { LeaderboardEntry } from '../types'
+import type { MatchWithRelations } from '../types/match'
+import { fetchAllProfiles, fetchAdminUserDetails } from './profileService'
+import { fetchMatchPredictionsAdmin } from './matchService'
+import { fetchLeaderboard } from './leaderboardService'
 
 export interface EmailQueueEntry {
   id: string
@@ -371,6 +375,59 @@ export function buildRankingEmail(
   </div>
 </body>
 </html>`
+}
+
+// Encola un correo de resultados por cada usuario activo para un partido recién cargado.
+// Omite usuarios que ya tengan un correo en cola para esa categoría (evita duplicados).
+// Debe llamarse con el objeto match ya actualizado (status:'finished', scores correctos).
+export async function enqueueMatchResultEmails(match: MatchWithRelations): Promise<number> {
+  const category = `partido_M${match.match_number}`
+
+  const [profiles, userDetails, preds, leaderboard, existingQueue] = await Promise.all([
+    fetchAllProfiles(),
+    fetchAdminUserDetails(),
+    fetchMatchPredictionsAdmin(match.id),
+    fetchLeaderboard(),
+    fetchEmailQueue(),
+  ])
+
+  const top5       = leaderboard.slice(0, 5)
+  const detailsMap = new Map(userDetails.map(d => [d.id, d]))
+  const alreadyQueued = new Set(
+    existingQueue
+      .filter(e => e.category === category && e.user_id)
+      .map(e => e.user_id!)
+  )
+
+  const matchInfo: MatchInfoForEmail = {
+    match_number:   match.match_number,
+    home_name:      match.home_team?.name ?? match.home_slot_label ?? '?',
+    away_name:      match.away_team?.name ?? match.away_slot_label ?? '?',
+    home_score_90:  match.home_score_90,
+    away_score_90:  match.away_score_90,
+    match_datetime: match.match_datetime,
+    status:         match.status,
+  }
+
+  const entries = profiles
+    .filter(p => p.is_active && !alreadyQueued.has(p.id) && detailsMap.has(p.id))
+    .map(p => {
+      const detail = detailsMap.get(p.id)!
+      const name   = p.display_name || p.username
+      return {
+        to_email:  detail.email,
+        to_name:   name,
+        subject:   `P${match.match_number}: ${matchInfo.home_name} vs ${matchInfo.away_name} — resultados de la penca`,
+        body_html: buildPartidoEmail(name, p.id, matchInfo, preds, top5),
+        category,
+        user_id:   p.id,
+      }
+    })
+
+  if (entries.length > 0) {
+    await enqueueEmails(entries)
+  }
+  return entries.length
 }
 
 // Genera el HTML del mail para usuarios sin apuestas
