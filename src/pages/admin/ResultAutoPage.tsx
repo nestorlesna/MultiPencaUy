@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, Play, Copy, Check, RefreshCw, ExternalLink } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { supabase } from '../../lib/supabase'
@@ -111,12 +111,160 @@ interface ApiSectionProps {
   defaultPath: string
   defaultParams?: string  // "key=val&key2=val2"
   description: string
+  renderVisual?: (data: unknown) => ReactNode | null
+}
+
+// ── Competition Info Card ─────────────────────────────────────────────────────
+
+interface WCWinner {
+  id: number; name: string; tla: string; crest: string
+  website: string; founded: number; clubColors: string; venue: string | null
+}
+interface WCSeason {
+  id: number; startDate: string; endDate: string
+  currentMatchday: number | null; winner: WCWinner | null
+}
+interface WCCompetition {
+  area: { id: number; name: string; code: string; flag: string | null }
+  id: number; name: string; code: string; type: string; emblem: string
+  currentSeason: WCSeason; seasons: WCSeason[]; lastUpdated: string
+}
+
+function isWCCompetition(data: unknown): data is WCCompetition {
+  return (
+    typeof data === 'object' && data !== null &&
+    'code' in data && 'seasons' in data && 'emblem' in data &&
+    Array.isArray((data as WCCompetition).seasons)
+  )
+}
+
+function CompetitionInfoCard({ data }: { data: WCCompetition }) {
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString('es', { day: 'numeric', month: 'short', year: 'numeric' })
+
+  // Palmarés: contar títulos por selección
+  const counts: Record<string, { name: string; tla: string; crest: string; count: number }> = {}
+  for (const s of data.seasons) {
+    if (s.winner) {
+      const w = s.winner
+      if (!counts[w.tla]) counts[w.tla] = { name: w.name, tla: w.tla, crest: w.crest, count: 0 }
+      counts[w.tla].count++
+    }
+  }
+  const palmares = Object.values(counts).sort((a, b) => b.count - a.count)
+  const maxTitles = palmares[0]?.count ?? 1
+
+  // Ediciones pasadas (con ganador, más reciente primero)
+  const pastSeasons = data.seasons
+    .filter(s => s.winner !== null)
+    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+
+  return (
+    <div className="space-y-3 mb-4">
+
+      {/* Header competición */}
+      <div className="bg-background border border-border rounded-xl p-4 flex items-center gap-4">
+        <img src={data.emblem} alt={data.name} className="w-16 h-16 object-contain flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <h3 className="text-lg font-bold text-text-primary leading-tight">{data.name}</h3>
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-800/40">
+              {data.type}
+            </span>
+            <span className="text-text-muted text-sm">{data.area.name}</span>
+            <span className="text-text-muted text-xs">· Código: {data.code}</span>
+            <span className="text-text-muted text-xs">· ID: {data.id}</span>
+          </div>
+          <p className="text-text-muted text-xs mt-1">
+            Actualizado: {fmt(data.lastUpdated)}
+          </p>
+        </div>
+      </div>
+
+      {/* Temporada actual */}
+      <div className="bg-background border border-border rounded-xl p-4">
+        <p className="text-[11px] text-text-muted uppercase tracking-wide mb-3">Temporada actual</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[10px] text-text-muted uppercase tracking-wide mb-0.5">Inicio</p>
+            <p className="text-sm text-text-primary font-medium">{fmt(data.currentSeason.startDate)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-text-muted uppercase tracking-wide mb-0.5">Fin</p>
+            <p className="text-sm text-text-primary font-medium">{fmt(data.currentSeason.endDate)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-text-muted uppercase tracking-wide mb-0.5">Jornada</p>
+            <p className="text-sm text-text-primary font-medium">{data.currentSeason.currentMatchday ?? '—'}</p>
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-border flex items-center gap-2">
+          {data.currentSeason.winner ? (
+            <>
+              <img src={data.currentSeason.winner.crest} alt={data.currentSeason.winner.name} className="w-6 h-6 object-contain" />
+              <span className="text-sm text-accent font-semibold">{data.currentSeason.winner.name}</span>
+            </>
+          ) : (
+            <span className="text-text-muted text-sm">Campeón: por definir</span>
+          )}
+        </div>
+      </div>
+
+      {/* Palmarés */}
+      <div className="bg-background border border-border rounded-xl p-4">
+        <p className="text-[11px] text-text-muted uppercase tracking-wide mb-3">
+          Palmarés histórico · {palmares.length} países campeones
+        </p>
+        <div className="space-y-2.5">
+          {palmares.map((team, i) => (
+            <div key={team.tla} className="flex items-center gap-3">
+              <span className="text-text-muted text-xs w-4 text-right flex-shrink-0">{i + 1}</span>
+              <img src={team.crest} alt={team.name} className="w-6 h-6 object-contain flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <span className="text-sm text-text-primary w-20 flex-shrink-0 truncate">{team.name}</span>
+              <div className="flex-1 flex items-center gap-2">
+                <div className="flex-1 bg-border rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-full bg-accent rounded-full"
+                    style={{ width: `${(team.count / maxTitles) * 100}%` }}
+                  />
+                </div>
+                <span className="text-accent font-bold text-sm w-4 text-right flex-shrink-0">{team.count}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Ediciones anteriores */}
+      <div className="bg-background border border-border rounded-xl p-4">
+        <p className="text-[11px] text-text-muted uppercase tracking-wide mb-3">
+          Ediciones anteriores · {pastSeasons.length} torneos
+        </p>
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {pastSeasons.map(season => {
+            const year = new Date(season.startDate).getFullYear()
+            const w = season.winner!
+            return (
+              <div key={season.id} className="flex items-center gap-2 bg-surface rounded-lg px-2.5 py-2 border border-border/50">
+                <img src={w.crest} alt={w.name} className="w-5 h-5 object-contain flex-shrink-0" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <div className="min-w-0">
+                  <p className="text-[10px] text-text-muted leading-tight">{year}</p>
+                  <p className="text-xs text-text-primary font-semibold leading-tight truncate">{w.tla}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+    </div>
+  )
 }
 
 // ── Sección genérica por API ──────────────────────────────────────────────────
 
 function ApiSection({
-  title, color, docsUrl, proxy, presets, defaultPath, defaultParams = '', description,
+  title, color, docsUrl, proxy, presets, defaultPath, defaultParams = '', description, renderVisual,
 }: ApiSectionProps) {
   const [open, setOpen]         = useState(true)
   const [path, setPath]         = useState(defaultPath)
@@ -234,6 +382,7 @@ function ApiSection({
           </div>
 
           {/* Resultado */}
+          {!loading && !error && result !== null && renderVisual?.(result)}
           <JsonResult data={result} loading={loading} error={error} />
         </div>
       )}
@@ -272,6 +421,7 @@ function ResultAutoContent() {
           { label: 'Posiciones grupos',     path: '/competitions/WC/standings' },
           { label: 'Próximos partidos',     path: '/matches', params: { competitions: 'WC', status: 'SCHEDULED' } },
         ]}
+        renderVisual={data => isWCCompetition(data) ? <CompetitionInfoCard data={data} /> : null}
       />
 
       {/* API 2 — api-football.com */}
