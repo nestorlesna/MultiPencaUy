@@ -30,6 +30,7 @@ import { SubgruposPage } from './pages/SubgruposPage'
 import { SubgrupoDetailPage } from './pages/SubgrupoDetailPage'
 import { DescargarAppPage } from './pages/DescargarAppPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
+import { ApiPage } from './pages/ApiPage'
 import { useUpdateCheck } from './hooks/useUpdateCheck'
 import { UpdateModal } from './components/ui/UpdateModal'
 
@@ -59,6 +60,7 @@ function AppContent() {
             <Route path="descargar"         element={<DescargarAppPage />} />
             <Route path="auth"              element={<AuthPage />} />
             <Route path="auth-callback"     element={<AuthCallbackPage />} />
+            <Route path="api-info"          element={<ApiPage />} />
             <Route path="ayuda"             element={<AyudaPage />} />
             <Route path="cuadro"            element={<BracketPage />} />
             <Route path="mas-puntos"        element={<MasPuntosPage />} />

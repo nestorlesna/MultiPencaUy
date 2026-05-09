@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trophy, Menu, X, ShieldCheck, HelpCircle, QrCode, Smartphone } from 'lucide-react'
+import { Trophy, Menu, X, ShieldCheck, HelpCircle, QrCode, Smartphone, Wifi } from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -51,6 +51,9 @@ export function Header() {
             <DeskNavLink to="/cuadro">Cuadro</DeskNavLink>
             {user && <DeskNavLink to="/mis-predicciones">JUGAR</DeskNavLink>}
             {user && <DeskNavLink to="/mas-puntos">+ Puntos</DeskNavLink>}
+            <DeskNavLink to="/api-info">
+              <Wifi size={14} className="inline mr-1" />API
+            </DeskNavLink>
             <DeskNavLink to="/ayuda">
               <HelpCircle size={14} className="inline mr-1" />Ayuda
             </DeskNavLink>
@@ -164,6 +167,7 @@ export function Header() {
             {user && <MobileNavLink to="/mas-puntos">+ Puntos</MobileNavLink>}
             {user && <MobileNavLink to="/perfil">Mi perfil</MobileNavLink>}
 {user && <MobileNavLink to="/descargar">Descargar app</MobileNavLink>}
+            <MobileNavLink to="/api-info">API · Tiempo real</MobileNavLink>
             <MobileNavLink to="/ayuda">Ayuda · Puntaje</MobileNavLink>
             {!user && <MobileNavLink to="/auth">Ingresar</MobileNavLink>}
           </nav>
