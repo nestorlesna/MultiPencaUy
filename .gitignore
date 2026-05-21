@@ -22,6 +22,10 @@ KEY/
 *.keystore
 *.jks
 
+# Backups de base de datos y temporales de Office — nunca commitear
+Datos/backup*.sql
+~$*
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

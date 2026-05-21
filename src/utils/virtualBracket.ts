@@ -10,7 +10,7 @@
  */
 
 import { supabase } from '../lib/supabase'
-import type { MatchWithRelations, TeamInfo } from '../types'
+import type { MatchWithRelations, TeamInfo, GroupStanding } from '../types'
 import type { PredictionWithMatch } from '../services/predictionService'
 
 // ── Raw DB types ──────────────────────────────────────────────────────────────
@@ -145,6 +145,46 @@ function computeGroupStandings(
   }
 
   return groupMap
+}
+
+/**
+ * Builds virtual group standings (compatible with the `GroupTable` component)
+ * from a user's group-stage predictions. Same ranking criteria as the SQL
+ * `group_standings` view. Teams without predictions simply stay at 0 points.
+ *
+ * @param teamsInGroups All 48 group teams (from fetchTeamsInGroups)
+ * @param predictions   User's predictions for ALL matches
+ */
+export function buildVirtualGroupStandings(
+  teamsInGroups: GroupTeamRow[],
+  predictions: PredictionWithMatch[],
+): GroupStanding[] {
+  const groupMap = computeGroupStandings(teamsInGroups, predictions)
+  const result: GroupStanding[] = []
+
+  for (const list of groupMap.values()) {
+    for (const e of list) {
+      result.push({
+        team_id: e.team.id,
+        group_id: e.group_id,
+        group_name: e.group_name,
+        group_order: e.group_order,
+        position: e.position,
+        has_override: false,
+        team_name: e.team.name,
+        team_abbreviation: e.team.abbreviation,
+        team_flag_url: e.team.flag_url,
+        is_confirmed: e.team.is_confirmed,
+        placeholder_name: e.team.placeholder_name,
+        pj: e.pj, pg: e.pg, pe: e.pe, pp: e.pp,
+        gf: e.gf, gc: e.gc, gd: e.gd, pts: e.pts,
+      })
+    }
+  }
+
+  return result.sort(
+    (a, b) => a.group_order - b.group_order || a.position - b.position,
+  )
 }
 
 // ── Winner determination ───────────────────────────────────────────────────────

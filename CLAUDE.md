@@ -113,8 +113,8 @@ src/
 ```
 /                     → redirect to /fixture
 /fixture              → Full schedule, filterable by phase/group/date
-/grupos               → All 12 groups with standings tables
-/grupos/:grupo        → Group detail + matches
+/grupos               → All 12 groups; tabs "Grupos del Torneo" (official) / "Mis Grupos" (virtual standings from user predictions)
+/grupos/:grupo        → Group detail + matches; ?vista=mias shows user's predicted standings/scores
 /equipos/:id          → Team profile
 /cuadro               → Visual knockout bracket (R32 → Final)
 /mis-predicciones     → Logged-in user's predictions + points history
