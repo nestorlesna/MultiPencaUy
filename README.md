@@ -10,7 +10,7 @@ Aplicación web de predicciones para la Copa Mundial de Fútbol FIFA 2026. Los u
 
 ### Para usuarios
 - **Fixture** — grilla completa de los 104 partidos, filtrable por fase/grupo/fecha
-- **Grupos** — tablas de posiciones en tiempo real con criterios FIFA (Pts → DG → GF)
+- **Grupos** — dos pestañas: **Grupos del Torneo** (posiciones oficiales en tiempo real con criterios FIFA: Pts → DG → GF) y **Mis Grupos** (posiciones virtuales calculadas con las apuestas del usuario en la fase de grupos). El detalle de cada grupo respeta la pestaña activa vía `?vista=mias`
 - **Cuadro** — bracket visual del torneo eliminatorio (dieciseisavos → Final) con banderas y marcadores
 - **Mis apuestas** — historial de predicciones y puntos ganados por partido; tab **Mi Cuadro** con el bracket eliminatorio personal
 - **+ Puntos** — apuestas especiales antes del torneo (podio, empates, rango de goles, etc.) con resultado real y puntos ganados visibles por sección
@@ -559,3 +559,22 @@ A partir de ese momento, los usuarios con la versión anterior verán el modal d
 ## Licencia
 
 Proyecto privado · Todos los derechos reservados · 2025-2026
+
+---
+
+## Backup de base de datos
+
+Backup completo de la base PostgreSQL de Supabase con `pg_dump`. Ejecutar en PowerShell:
+
+```powershell
+$env:PGPASSWORD = '<password-de-la-base>'
+.\pg_dump.exe `
+  --host=aws-1-us-east-2.pooler.supabase.com `
+  --port=5432 `
+  --username=postgres.twdruhhhnsbrpyzlfxmg `
+  --dbname=postgres `
+  --no-owner --no-privileges `
+  -f backup.sql
+```
+
+> **Importante:** nunca dejar la contraseña real en el README ni en el código. Obtenerla desde Supabase → Project Settings → Database. El archivo `.sql` resultante contiene datos de usuarios — no commitearlo al repo.
