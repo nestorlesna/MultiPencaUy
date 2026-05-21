@@ -1,7 +1,7 @@
 {
-  "version_code": 45,
-  "version_name": "1.1.5",
-  "apk_url": "https://github.com/nestorlesna/Penca2026uy/releases/download/v1.1.5/Penca2026uy.apk",
-  "release_notes": "Fix build postinstall ESM",
+  "version_code": 46,
+  "version_name": "1.1.6",
+  "apk_url": "https://github.com/nestorlesna/Penca2026uy/releases/download/v1.1.6/Penca2026uy.apk",
+  "release_notes": "Agregado de Mis Grupos",
   "force_update": false
 }
