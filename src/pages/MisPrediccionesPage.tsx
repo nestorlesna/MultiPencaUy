@@ -6,10 +6,22 @@ import { TeamFlag } from '../components/ui/TeamFlag'
 import { useMatches } from '../hooks/useMatches'
 import { useMyPredictionsMap, useMyPredictions } from '../hooks/usePredictions'
 import { formatMatchDay, formatMatchTime } from '../utils/datetime'
+import { GROUPS } from '../utils/constants'
 import type { MatchWithRelations } from '../types/match'
 import type { PredictionWithMatch } from '../services/predictionService'
 
 type Tab = 'predecir' | 'historial'
+
+const PHASE_TABS = [
+  { label: 'Todos',   phaseOrder: undefined },
+  { label: 'Grupos',  phaseOrder: 1 },
+  { label: '16avos',  phaseOrder: 2 },
+  { label: '8vos',    phaseOrder: 3 },
+  { label: 'Cuartos', phaseOrder: 4 },
+  { label: 'Semi',    phaseOrder: 5 },
+  { label: '3er',     phaseOrder: 6 },
+  { label: 'Final',   phaseOrder: 7 },
+]
 
 function ScoreBadge({ pred }: { pred: PredictionWithMatch }) {
   return (
@@ -37,7 +49,9 @@ function PointsBadge({ points }: { points: number | null }) {
 // ─── Tab: Predecir ────────────────────────────────────────────────────────────
 
 function PredecirTab() {
-  const { data: matches = [], isLoading } = useMatches()
+  const [phaseOrder, setPhaseOrder] = useState<number | undefined>(undefined)
+  const [groupName, setGroupName] = useState<string | undefined>(undefined)
+  const { data: matches = [], isLoading } = useMatches({ phaseOrder, groupName })
   const { data: predsMap = new Map(), isLoading: loadingPreds } = useMyPredictionsMap()
   const [selected, setSelected] = useState<MatchWithRelations | null>(null)
 
@@ -46,26 +60,78 @@ function PredecirTab() {
     [matches]
   )
 
-  if (isLoading || loadingPreds) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="animate-spin text-primary" size={28} />
-      </div>
-    )
-  }
-
-  if (upcoming.length === 0) {
-    return (
-      <p className="text-text-muted text-sm text-center py-12">
-        No hay partidos próximos para predecir.
-      </p>
-    )
-  }
+  const showGroupFilter = phaseOrder === 1 || phaseOrder === undefined
 
   return (
     <>
+      {/* Tabs de fase */}
+      <div className="flex gap-1 overflow-x-auto pb-1 mb-3 scrollbar-hide -mx-4 px-4">
+        {PHASE_TABS.map((t) => (
+          <button
+            key={t.label}
+            onClick={() => {
+              setPhaseOrder(t.phaseOrder)
+              if (t.phaseOrder !== 1 && t.phaseOrder !== undefined) {
+                setGroupName(undefined)
+              }
+            }}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              phaseOrder === t.phaseOrder
+                ? 'bg-primary text-white'
+                : 'bg-surface-2 text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filtro de grupo (solo en fase grupos o "todos") */}
+      {showGroupFilter && (
+        <div className="flex gap-1 overflow-x-auto pb-1 mb-4 scrollbar-hide -mx-4 px-4">
+          <button
+            onClick={() => setGroupName(undefined)}
+            className={`flex-shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+              !groupName
+                ? 'bg-accent/20 text-accent'
+                : 'text-text-muted hover:text-text-secondary'
+            }`}
+          >
+            Todos
+          </button>
+          {GROUPS.map((g) => (
+            <button
+              key={g}
+              onClick={() => {
+                setGroupName(g)
+                setPhaseOrder(1)
+              }}
+              className={`flex-shrink-0 px-2 h-7 rounded text-xs font-bold transition-colors ${
+                groupName === g
+                  ? 'bg-accent/20 text-accent'
+                  : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              G. {g}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {(isLoading || loadingPreds) && (
+        <div className="flex justify-center py-16">
+          <Loader2 className="animate-spin text-primary" size={28} />
+        </div>
+      )}
+
+      {!isLoading && !loadingPreds && upcoming.length === 0 && (
+        <p className="text-text-muted text-sm text-center py-12">
+          No hay partidos próximos para predecir.
+        </p>
+      )}
+
       <div className="space-y-2">
-        {upcoming.map(match => {
+        {!isLoading && !loadingPreds && upcoming.map(match => {
           const pred = predsMap.get(match.id) ?? null
           return (
             <div
