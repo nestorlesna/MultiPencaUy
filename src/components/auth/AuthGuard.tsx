@@ -10,7 +10,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-/** Bloquea acceso si no está activo (pendiente de aprobación) */
+/** Bloquea acceso si la cuenta fue desactivada por un administrador */
 export function RequireActive({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, signOut } = useAuth()
   if (loading) return null
@@ -23,10 +23,10 @@ export function RequireActive({ children }: { children: React.ReactNode }) {
           <Clock className="text-accent" size={32} />
         </div>
         <h1 className="text-xl font-bold text-text-primary mb-2">
-          Cuenta pendiente de aprobación
+          Cuenta desactivada
         </h1>
         <p className="text-text-secondary text-sm max-w-xs mb-6">
-          Tu registro fue recibido. El administrador activará tu cuenta pronto.
+          Tu cuenta fue desactivada por el administrador. Escribinos si creés que es un error.
         </p>
         <button onClick={signOut} className="btn-secondary text-sm">
           Cerrar sesión

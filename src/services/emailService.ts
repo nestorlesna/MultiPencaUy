@@ -5,6 +5,17 @@ import { fetchAllProfiles, fetchAdminUserDetails } from './profileService'
 import { fetchMatchPredictionsAdmin } from './matchService'
 import { fetchLeaderboard } from './leaderboardService'
 
+// Escapa caracteres HTML para evitar inyección vía datos de usuario
+// (display_name / username) en el cuerpo de los correos.
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 export interface EmailQueueEntry {
   id: string
   to_email: string
@@ -98,7 +109,7 @@ export function buildGruposIncompletosEmail(
 
     <!-- Body -->
     <div style="padding:32px 24px;">
-      <p style="color:#F8FAFC;font-size:17px;margin:0 0 12px 0;font-weight:bold;">¡Hola, ${displayName}!</p>
+      <p style="color:#F8FAFC;font-size:17px;margin:0 0 12px 0;font-weight:bold;">¡Hola, ${escapeHtml(displayName)}!</p>
 
       <!-- Progreso visual -->
       <div style="background:#1E2535;border-radius:8px;padding:16px;margin:0 0 20px 0;text-align:center;">
@@ -181,7 +192,7 @@ export function buildPartidoEmail(
     const bg   = isMe ? '#10B981' : (i % 2 === 0 ? '#141925' : '#1a2030')
     const fc   = isMe ? '#0B0F1A' : '#F8FAFC'
     const muted = isMe ? '#064E3B' : '#94A3B8'
-    const name  = p.display_name || p.username
+    const name  = escapeHtml(p.display_name || p.username)
     return `
       <tr style="background:${bg};">
         <td style="padding:8px 10px;font-size:13px;color:${muted};text-align:center;border-radius:4px 0 0 4px;">${i + 1}</td>
@@ -206,7 +217,7 @@ export function buildPartidoEmail(
     <div style="background:#141925;padding:28px 24px;text-align:center;border-bottom:1px solid #1E2535;">
       <p style="margin:0 0 6px 0;font-size:24px;">⚽</p>
       <h1 style="color:#F59E0B;margin:0;font-size:20px;font-weight:bold;">
-        ${match.home_name} vs ${match.away_name}
+        ${escapeHtml(match.home_name)} vs ${escapeHtml(match.away_name)}
       </h1>
       <p style="color:#94A3B8;margin:8px 0 4px 0;font-size:13px;">Partido ${match.match_number} · ${dateStr}</p>
       <p style="color:${isFinished ? '#10B981' : '#F59E0B'};margin:0;font-size:20px;font-weight:bold;letter-spacing:2px;">
@@ -217,7 +228,7 @@ export function buildPartidoEmail(
     <!-- Body -->
     <div style="padding:24px;">
       <p style="color:#F8FAFC;font-size:16px;margin:0 0 20px 0;">
-        ¡Hola, <strong>${recipientName}</strong>! Así quedaron las apuestas de todos.
+        ¡Hola, <strong>${escapeHtml(recipientName)}</strong>! Así quedaron las apuestas de todos.
       </p>
 
       <!-- Tabla de predicciones -->
@@ -249,7 +260,7 @@ export function buildPartidoEmail(
           const pc   = isMe ? '#064E3B' : '#F59E0B'
           return `<div style="background:${bg};border-radius:6px;padding:8px 12px;margin-bottom:4px;display:flex;align-items:center;gap:10px;">
             <span style="font-size:16px;width:24px;flex-shrink:0;text-align:center;">${medals[i]}</span>
-            <span style="flex:1;font-size:13px;color:${fc};font-weight:${isMe ? 'bold' : 'normal'};overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${e.display_name || e.username}${isMe ? ' (vos)' : ''}</span>
+            <span style="flex:1;font-size:13px;color:${fc};font-weight:${isMe ? 'bold' : 'normal'};overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${escapeHtml(e.display_name || e.username)}${isMe ? ' (vos)' : ''}</span>
             <span style="font-size:13px;font-weight:bold;color:${pc};flex-shrink:0;">${e.total_points} pts</span>
           </div>`
         }).join('')}
@@ -305,7 +316,7 @@ export function buildRankingEmail(
       <div style="${rowStyle(isUser)}">
         <span style="font-size:18px;width:32px;flex-shrink:0;text-align:center;margin-right:10px;">${medal}</span>
         <span style="flex:1;font-size:14px;font-weight:${isUser ? 'bold' : 'normal'};color:${nameColor(isUser)};overflow:hidden;white-space:nowrap;text-overflow:ellipsis;margin-right:16px;">
-          ${entry.display_name || entry.username}${isUser ? ' (vos)' : ''}
+          ${escapeHtml(entry.display_name || entry.username)}${isUser ? ' (vos)' : ''}
         </span>
         <span style="font-size:14px;font-weight:bold;color:${ptColor(isUser)};flex-shrink:0;white-space:nowrap;">${pts} pts</span>
       </div>`
@@ -344,7 +355,7 @@ export function buildRankingEmail(
 
     <!-- Body -->
     <div style="padding:32px 24px;">
-      <p style="color:#F8FAFC;font-size:17px;margin:0 0 6px 0;font-weight:bold;">¡Hola, ${recipientName}!</p>
+      <p style="color:#F8FAFC;font-size:17px;margin:0 0 6px 0;font-weight:bold;">¡Hola, ${escapeHtml(recipientName)}!</p>
       <p style="color:#94A3B8;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
         Así está el ranking de la penca. ¿Vas a remontar?
       </p>
@@ -450,7 +461,7 @@ export function buildNoApuestasEmail(displayName: string): string {
 
     <!-- Body -->
     <div style="padding:32px 24px;">
-      <p style="color:#F8FAFC;font-size:17px;margin:0 0 12px 0;font-weight:bold;">¡Hola, ${displayName}!</p>
+      <p style="color:#F8FAFC;font-size:17px;margin:0 0 12px 0;font-weight:bold;">¡Hola, ${escapeHtml(displayName)}!</p>
       <p style="color:#94A3B8;font-size:14px;line-height:1.7;margin:0 0 20px 0;">
         El Mundial 2026 arranca el <strong style="color:#F8FAFC;">11 de junio</strong> y todavía
         no cargaste ninguna apuesta en la penca. ¡No te quedés afuera!

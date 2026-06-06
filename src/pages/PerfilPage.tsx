@@ -229,7 +229,7 @@ function PerfilContent() {
           <span className="text-xs text-text-muted">Estado de cuenta</span>
           {profile.is_active
             ? <span className="badge-primary">Activa</span>
-            : <span className="badge bg-warning/20 text-warning text-xs px-2 py-0.5 rounded-full">Pendiente</span>
+            : <span className="badge bg-warning/20 text-warning text-xs px-2 py-0.5 rounded-full">Desactivada</span>
           }
         </div>
       </div>

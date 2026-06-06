@@ -28,9 +28,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { path, ...rest } = req.query as Record<string, string>
   if (!path) return res.status(400).json({ error: 'Falta el parámetro path' })
 
+  // Anti-SSRF: el path debe ser una ruta relativa simple. Evita que un
+  // path tipo "@otrohost/..." o "//otrohost" desvíe la petición (y la
+  // API key) a un servidor arbitrario.
+  if (!path.startsWith('/') || path.startsWith('//') || /[@\\]/.test(path)) {
+    return res.status(400).json({ error: 'Path inválido' })
+  }
+
   const apiKey = process.env.SPORTSDB_API_KEY ?? '3'
   const qs = new URLSearchParams(rest).toString()
   const url = `https://www.thesportsdb.com/api/v1/json/${apiKey}${path}${qs ? `?${qs}` : ''}`
+
+  // Defensa adicional: confirmar que el host final no cambió.
+  try {
+    if (new URL(url).host !== 'www.thesportsdb.com') {
+      return res.status(400).json({ error: 'Path inválido' })
+    }
+  } catch {
+    return res.status(400).json({ error: 'Path inválido' })
+  }
 
   try {
     const response = await fetch(url)

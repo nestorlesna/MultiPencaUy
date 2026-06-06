@@ -23,7 +23,7 @@ Aplicación web de predicciones para la Copa Mundial de Fútbol FIFA 2026. Los u
 - **Partidos** — edición de fecha/hora, equipos y estadio de cada partido
 - **Equipos** — edición de nombre, abreviación y bandera de cada equipo
 - **Terceros** — ranking de los 12 terceros de grupo para el armado del R32
-- **Usuarios** — aprobación y activación/desactivación de usuarios
+- **Usuarios** — activación/desactivación y gestión de roles (admin / cargador) de usuarios
 - **Auditoría** — historial de cambios en predicciones con filtros
 - **Configuración** — puntajes parametrizables para todos los tipos de acierto y bonus
 - **Correos** — gestión de cola de correos salientes: encolado manual por tipo (sin apuestas, grupos incompletos, ranking, partido), envío individual o masivo vía SMTP, vista previa de HTML, filtros y eliminación

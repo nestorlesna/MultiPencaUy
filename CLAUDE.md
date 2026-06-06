@@ -146,9 +146,11 @@ export const supabase = createClient(
 
 - Supabase Auth (email/password)
 - `profiles` table mirrors `auth.users` — created via trigger on signup
-- `profiles.is_active` = false by default; admin must activate user before they can predict
+- `profiles.is_active` = true by default (created via signup trigger) — users can predict immediately, no admin approval step; admin can deactivate from Admin → Usuarios
 - `profiles.is_admin` = false by default
+- `profiles.is_loader` = false by default — can load match results without full admin access (added in `11_loader_role.sql`)
 - RLS policies: public read on fixture data; predictions are user-owned; admin writes via `is_admin` check
+- Self profile edits (`profiles_editar_propio`) cannot change `is_admin` / `is_active` / `is_loader` — enforced in the policy's WITH CHECK (see `11_loader_role.sql` / `14_security_fixes.sql`)
 - Prediction lock: RLS uses server-side `now()` vs `match_datetime` — immune to client clock manipulation
 
 ### Key database tables
@@ -185,7 +187,18 @@ export const supabase = createClient(
 05_storage.sql         # Storage buckets
 06_audit.sql           # predictions_audit table + trigger
 07_bonus.sql           # bonus tables + calculate_bonus_points() + updated leaderboard view
+08_group_overrides.sql # manual group standing overrides
+09_combinaciones.sql   # FIFA best-thirds combination table + populate_knockout rewrite
+10_recalculate_all.sql # recalculate_all() RPC
+11_loader_role.sql     # is_loader column + matches/profiles RLS update
+12_subgrupos.sql       # subgrupos (private mini-leagues) tables + RLS + views
+13_admin_functions.sql # admin_get_user_details() RPC
+14_security_fixes.sql  # RLS hardening: block is_loader self-escalation + server-side bonus lock
+15_security_fixes_2.sql # profiles auth-only read, private subgrupos (member-only), explicit WITH CHECK
+16_rpc_authorization.sql # role guard on SECURITY DEFINER RPCs (admin/loader for result flow; admin-only for group preds). Authoritative final form of those 5 functions.
 ```
+
+Standalone (run after their dependencies): `08_email_queue.sql`, `08b_group_predictions_rpc.sql`, `08c_match_predictions_rpc.sql`.
 
 `00_reset_init.sql` — full reset + complete tournament data (groups, phases, stadiums, 48 teams, 104 matches, 64 knockout rules). Requires `nestor.lesna@gmail.com` in auth.users; that user becomes the admin.
 
@@ -226,4 +239,6 @@ The `phases` table has a column named `order` which conflicts with PostgREST's `
 
 ### Bonus predictions locking
 
-Bonus predictions are locked when the tournament has started (any match is not `scheduled`). This is enforced client-side in `MasPuntosPage` via `isTournamentStarted()`. The DB does not enforce a hard lock, relying on the UI gate.
+Bonus predictions are locked once the tournament has started (any match's `match_datetime <= now()`). Enforced in **two layers**:
+- Client-side UX gate in `MasPuntosPage` via `isTournamentStarted()`.
+- **Server-side RLS** (`bonus_pred_own_insert` / `bonus_pred_own_update` in `07_bonus.sql`, hardened in `14_security_fixes.sql`): the WITH CHECK rejects writes when `EXISTS (SELECT 1 FROM matches WHERE match_datetime <= now())`. Uses server `now()` — immune to client clock manipulation, like the per-match prediction lock.
