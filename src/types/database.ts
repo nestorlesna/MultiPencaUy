@@ -141,7 +141,7 @@ export interface Profile {
   username: string
   display_name: string
   avatar_url: string | null
-  is_active: boolean  // admin must approve
+  is_active: boolean  // true por defecto al registrarse; el admin puede desactivar
   is_admin: boolean
   is_loader: boolean  // puede cargar resultados, sin acceso al resto del admin
   created_at: string

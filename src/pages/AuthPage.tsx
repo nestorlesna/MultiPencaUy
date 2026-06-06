@@ -129,7 +129,7 @@ export function AuthPage() {
     if (error) {
       setError(traducirError(error.message))
     } else {
-      setSuccess('¡Registro exitoso! Tu cuenta está pendiente de aprobación por el administrador.')
+      setSuccess('¡Registro exitoso! Revisá tu correo para confirmar la cuenta y ya podés empezar a predecir.')
       setEmail(''); setPassword(''); setDisplayName(''); setUsername('')
       setCaptchaToken(null)
     }
@@ -444,7 +444,7 @@ export function AuthPage() {
 
           {tab === 'register' && (
             <p className="text-[11px] text-text-muted text-center mt-4">
-              Tu cuenta requiere aprobación del administrador antes de poder predecir.
+              Tu cuenta queda activa al registrarte. ¡Apostá antes de que empiece cada partido!
             </p>
           )}
         </div>

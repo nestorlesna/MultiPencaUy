@@ -24,20 +24,41 @@ CREATE INDEX idx_subgrupo_members_user ON subgrupo_members(user_id);
 ALTER TABLE subgrupos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subgrupo_members ENABLE ROW LEVEL SECURITY;
 
--- Todos pueden leer subgrupos
-CREATE POLICY "subgrupos_read_public"
+-- Helper SECURITY DEFINER: ¿el usuario actual es miembro del subgrupo?
+-- SECURITY DEFINER evita recursión de RLS sobre subgrupo_members.
+CREATE OR REPLACE FUNCTION is_subgrupo_member(p_subgrupo_id uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM subgrupo_members
+    WHERE subgrupo_id = p_subgrupo_id
+      AND user_id = auth.uid()
+  );
+$$;
+
+-- Subgrupos privados: solo creador, miembros o admin pueden verlos
+CREATE POLICY "subgrupos_read_member"
   ON subgrupos FOR SELECT
-  USING (true);
+  USING (
+    creator_id = auth.uid()
+    OR is_subgrupo_member(id)
+    OR (SELECT is_admin FROM profiles WHERE id = auth.uid())
+  );
 
 -- Solo el creador puede insertar
 CREATE POLICY "subgrupos_insert_creator"
   ON subgrupos FOR INSERT
   WITH CHECK (auth.uid() = creator_id);
 
--- Solo el creador puede actualizar
+-- Solo el creador puede actualizar (sin poder reasignar creator_id)
 CREATE POLICY "subgrupos_update_creator"
   ON subgrupos FOR UPDATE
-  USING (auth.uid() = creator_id);
+  USING (auth.uid() = creator_id)
+  WITH CHECK (auth.uid() = creator_id);
 
 -- Admin puede actualizar cualquier subgrupo
 CREATE POLICY "subgrupos_update_admin"
@@ -58,10 +79,14 @@ CREATE POLICY "subgrupos_delete_admin"
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
   );
 
--- Todos pueden leer miembros
-CREATE POLICY "subgrupo_members_read_public"
+-- Miembros visibles solo para integrantes del mismo subgrupo (o admin)
+CREATE POLICY "subgrupo_members_read_member"
   ON subgrupo_members FOR SELECT
-  USING (true);
+  USING (
+    user_id = auth.uid()
+    OR is_subgrupo_member(subgrupo_id)
+    OR (SELECT is_admin FROM profiles WHERE id = auth.uid())
+  );
 
 -- El creador del subgrupo puede agregar miembros
 CREATE POLICY "subgrupo_members_insert_creator"
@@ -134,8 +159,10 @@ CREATE TRIGGER trg_subgrupo_limit
   EXECUTE FUNCTION check_subgrupo_limit();
 
 -- ─── View: subgrupo_ranking ───────────────────────────────────────────────
--- Ranking de miembros de un subgrupo basado en leaderboard
-CREATE OR REPLACE VIEW subgrupo_ranking AS
+-- Ranking de miembros de un subgrupo basado en leaderboard.
+-- security_invoker: respeta la RLS del usuario que consulta (subgrupos privados).
+CREATE OR REPLACE VIEW subgrupo_ranking
+WITH (security_invoker = true) AS
 SELECT
   sm.subgrupo_id,
   sm.user_id,
@@ -153,8 +180,10 @@ JOIN subgrupos sg ON sg.id = sm.subgrupo_id
 WHERE sg.is_active = true;
 
 -- ─── View: my_subgrupos_view ──────────────────────────────────────────────
--- Subgrupos activos donde el usuario es miembro
-CREATE OR REPLACE VIEW my_subgrupos_view AS
+-- Subgrupos activos donde el usuario es miembro.
+-- security_invoker: respeta la RLS del usuario que consulta.
+CREATE OR REPLACE VIEW my_subgrupos_view
+WITH (security_invoker = true) AS
 SELECT
   sg.id,
   sg.name,

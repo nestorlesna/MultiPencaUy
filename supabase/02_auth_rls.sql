@@ -89,8 +89,12 @@ CREATE POLICY "scoring_admin"  ON scoring_config      FOR ALL USING (is_admin())
 -- ============================================================
 -- POLÍTICAS: PERFILES
 -- ============================================================
--- Lectura pública (para ranking, páginas de perfil)
-CREATE POLICY "profiles_lectura_publica" ON profiles FOR SELECT USING (true);
+-- Lectura solo para usuarios autenticados (el ranking público usa la
+-- vista leaderboard, que se ejecuta con privilegios del owner).
+-- No exponemos is_admin / is_loader a visitantes anónimos.
+CREATE POLICY "profiles_lectura_autenticados" ON profiles FOR SELECT
+  TO authenticated
+  USING (true);
 
 -- El usuario puede editar su propio perfil (sin poder cambiarse is_admin / is_active)
 CREATE POLICY "profiles_editar_propio" ON profiles FOR UPDATE
