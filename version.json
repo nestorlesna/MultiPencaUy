@@ -1,7 +1,7 @@
 {
-    "version_code":  53,
-    "version_name":  "1.1.13",
-    "apk_url":  "https://github.com/nestorlesna/Penca2026uy/releases/download/v1.1.13/Penca2026uy.apk",
-    "release_notes":  "Nueva version disponible",
+    "version_code":  54,
+    "version_name":  "1.1.14",
+    "apk_url":  "https://github.com/nestorlesna/Penca2026uy/releases/download/v1.1.14/Penca2026uy.apk",
+    "release_notes":  "Fix para ver si arregla el login",
     "force_update":  false
 }
