@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { forwardRef } from 'react'
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile'
 
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY
@@ -9,30 +9,25 @@ type CaptchaProps = {
   onError?: () => void
 }
 
-export function Captcha({ onSuccess, onExpire, onError }: CaptchaProps) {
-  const ref = useRef<TurnstileInstance>(null)
+export const Captcha = forwardRef<TurnstileInstance, CaptchaProps>(
+  function Captcha({ onSuccess, onExpire, onError }, ref) {
+    if (!SITE_KEY) return null
 
-  const handleExpire = useCallback(() => {
-    ref.current?.reset()
-    onExpire?.()
-  }, [onExpire])
-
-  if (!SITE_KEY) return null
-
-  return (
-    <Turnstile
-      ref={ref}
-      siteKey={SITE_KEY}
-      onSuccess={onSuccess}
-      onExpire={handleExpire}
-      onError={onError}
-      options={{
-        theme: 'dark',
-        size: 'flexible',
-        retry: 'auto',
-        refreshExpired: 'auto',
-      }}
-      className="mx-auto"
-    />
-  )
-}
+    return (
+      <Turnstile
+        ref={ref}
+        siteKey={SITE_KEY}
+        onSuccess={onSuccess}
+        onExpire={onExpire}
+        onError={onError}
+        options={{
+          theme: 'dark',
+          size: 'flexible',
+          retry: 'auto',
+          refreshExpired: 'auto',
+        }}
+        className="mx-auto"
+      />
+    )
+  }
+)

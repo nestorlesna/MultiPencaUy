@@ -1,8 +1,9 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect, useRef, type FormEvent } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Trophy, Loader2, Eye, EyeOff, Clock } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth'
+import { type TurnstileInstance } from '@marsidev/react-turnstile'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { Captcha } from '../components/ui/Captcha'
@@ -79,39 +80,82 @@ export function AuthPage() {
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaRef = useRef<TurnstileInstance>(null)
+  const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null)
+  const [resendLoading, setResendLoading] = useState(false)
+
+  function resetCaptcha() {
+    setCaptchaToken(null)
+    captchaRef.current?.reset()
+  }
+
+  // Devuelve el token actual o espera a que el widget emita uno nuevo
+  // (cubre el caso de enviar el formulario antes de que termine la verificación).
+  async function getCaptchaToken(): Promise<string | null> {
+    if (captchaToken) return captchaToken
+    try {
+      return (await captchaRef.current?.getResponsePromise(15000)) ?? null
+    } catch {
+      return null
+    }
+  }
 
   // Si ya está logueado y activo, redirigir
   if (user && isActive) return <Navigate to="/fixture" replace />
 
+  async function handleResendConfirmation() {
+    if (!pendingConfirmEmail) return
+    setResendLoading(true)
+    const { error } = await supabase.auth.resend({ type: 'signup', email: pendingConfirmEmail })
+    setResendLoading(false)
+    if (error) {
+      setError('No se pudo reenviar el email. Intentá de nuevo en unos minutos.')
+    } else {
+      setPendingConfirmEmail(null)
+      setError(null)
+      setSuccess('Se reenvió el email de confirmación. Revisá tu bandeja de entrada.')
+    }
+  }
+
   async function handleLogin(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!captchaToken) {
+    setPendingConfirmEmail(null)
+    setLoading(true)
+    const token = await getCaptchaToken()
+    if (!token) {
       setError('Por favor completá la verificación de seguridad.')
+      setLoading(false)
       return
     }
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })
-    if (error) setError(traducirError(error.message))
+    const { error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken: token } })
+    if (error) {
+      if (error.message.includes('Email not confirmed')) {
+        setPendingConfirmEmail(email)
+      }
+      setError(traducirError(error.message))
+      resetCaptcha()
+    }
     setLoading(false)
   }
 
   async function handleRegister(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!captchaToken) {
-      setError('Por favor completá la verificación de seguridad.')
-      return
-    }
-    setLoading(true)
 
     if (username.length < 3) {
       setError('El nombre de usuario debe tener al menos 3 caracteres.')
-      setLoading(false)
       return
     }
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       setError('El usuario solo puede contener letras, números y _')
+      return
+    }
+
+    setLoading(true)
+    const token = await getCaptchaToken()
+    if (!token) {
+      setError('Por favor completá la verificación de seguridad.')
       setLoading(false)
       return
     }
@@ -121,17 +165,18 @@ export function AuthPage() {
       password,
       options: {
         data: { username, full_name: displayName },
-        captchaToken,
+        captchaToken: token,
         emailRedirectTo: window.location.origin,
       },
     })
 
     if (error) {
       setError(traducirError(error.message))
+      resetCaptcha()
     } else {
       setSuccess('¡Registro exitoso! Revisá tu correo para confirmar la cuenta y ya podés empezar a predecir.')
       setEmail(''); setPassword(''); setDisplayName(''); setUsername('')
-      setCaptchaToken(null)
+      resetCaptcha()
     }
     setLoading(false)
   }
@@ -139,21 +184,24 @@ export function AuthPage() {
   async function handleRecover(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    if (!captchaToken) {
+    setLoading(true)
+    const token = await getCaptchaToken()
+    if (!token) {
       setError('Por favor completá la verificación de seguridad.')
+      setLoading(false)
       return
     }
-    setLoading(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth?tab=reset`,
-      captchaToken
+      captchaToken: token
     })
     if (error) {
       setError(traducirError(error.message))
+      resetCaptcha()
     } else {
       setSuccess('Se ha enviado un correo con instrucciones para restablecer tu contraseña.')
       setEmail('')
-      setCaptchaToken(null)
+      resetCaptcha()
     }
     setLoading(false)
   }
@@ -233,7 +281,8 @@ export function AuthPage() {
                     setTab(t);
                     setError(null);
                     setSuccess(null);
-                    setCaptchaToken(null);
+                    setPendingConfirmEmail(null);
+                    resetCaptcha();
                     setSearchParams({});
                   }}
                   className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -251,7 +300,7 @@ export function AuthPage() {
           {tab === 'forgot' && (
             <div className="mb-5">
               <button
-                onClick={() => { setTab('login'); setError(null); setSuccess(null) }}
+                onClick={() => { setTab('login'); setError(null); setSuccess(null); resetCaptcha() }}
                 className="text-xs text-primary hover:underline flex items-center gap-1"
               >
                 ← Volver al ingreso
@@ -278,7 +327,18 @@ export function AuthPage() {
           {/* Error */}
           {error && (
             <div className="bg-error/10 border border-error/30 text-error text-sm rounded-lg p-3 mb-4">
-              {error}
+              <p>{error}</p>
+              {pendingConfirmEmail && (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendLoading}
+                  className="mt-2 text-xs underline text-error/80 hover:text-error disabled:opacity-50 flex items-center gap-1"
+                >
+                  {resendLoading && <Loader2 size={12} className="animate-spin" />}
+                  Reenviar email de confirmación
+                </button>
+              )}
             </div>
           )}
 
@@ -433,6 +493,7 @@ export function AuthPage() {
 
           <div className="mt-4">
             <Captcha
+              ref={captchaRef}
               onSuccess={token => setCaptchaToken(token)}
               onExpire={() => setCaptchaToken(null)}
               onError={() => {
@@ -457,6 +518,7 @@ export function AuthPage() {
 
 function traducirError(msg: string): string {
   if (msg.includes('Invalid login credentials')) return 'Email o contraseña incorrectos.'
+  if (msg.includes('Email not confirmed'))       return 'Tu cuenta aún no fue confirmada. Revisá tu bandeja de entrada y hacé clic en el link que te enviamos al registrarte.'
   if (msg.includes('User already registered'))   return 'Ya existe una cuenta con ese email.'
   if (msg.includes('Password should be'))        return 'La contraseña debe tener al menos 6 caracteres.'
   if (msg.includes('Unable to validate email'))  return 'El formato del email no es válido.'
