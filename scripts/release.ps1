@@ -21,6 +21,13 @@ function Assert-LastCommand {
     }
 }
 
+# -- 0. Verificar que no haya codigo sin commitear ------------------------------
+$DirtySrc = git status --porcelain -- src/ public/ index.html package.json
+if ($DirtySrc) {
+    Write-Error "Hay cambios sin commitear en el codigo fuente. Commitealos antes de lanzar el release:`n$($DirtySrc -join "`n")"
+    exit 1
+}
+
 # -- 1. build.gradle -----------------------------------------------------------
 $Gradle = Get-Content $GradlePath -Raw -Encoding UTF8
 
