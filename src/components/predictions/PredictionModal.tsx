@@ -76,6 +76,9 @@ export function PredictionModal({ match, existing, onClose }: Props) {
   const { mutate: save, isPending: saving } = useMutation({
     mutationFn: async () => {
       if (!user || !match) return
+      if (new Date(match.match_datetime) <= new Date()) {
+        throw new Error('Este partido ya comenzó. No podés modificar tu predicción.')
+      }
       const isKnockout = match.phase.has_extra_time
       const draw90 = form.homeScore === form.awayScore
       const showEt = isKnockout && draw90
