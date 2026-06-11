@@ -133,11 +133,16 @@ function PredecirTab() {
       <div className="space-y-2">
         {!isLoading && !loadingPreds && upcoming.map(match => {
           const pred = predsMap.get(match.id) ?? null
+          const isStarted = new Date(match.match_datetime) <= new Date()
           return (
             <div
               key={match.id}
-              className="card p-3 flex items-center gap-3 cursor-pointer hover:border-primary/40 transition-colors"
-              onClick={() => setSelected(match)}
+              className={`card p-3 flex items-center gap-3 transition-colors ${
+                isStarted
+                  ? 'opacity-60 cursor-default'
+                  : 'cursor-pointer hover:border-primary/40'
+              }`}
+              onClick={() => !isStarted && setSelected(match)}
             >
               {/* Phase badge + number */}
               <div className="flex-shrink-0 w-10 text-center">
@@ -169,7 +174,16 @@ function PredecirTab() {
 
               {/* Prediction status */}
               <div className="flex-shrink-0 text-right min-w-[60px]">
-                {pred ? (
+                {isStarted ? (
+                  <div className="flex flex-col items-end gap-0.5">
+                    <Lock size={12} className="text-text-muted" />
+                    {pred ? (
+                      <ScoreBadge pred={pred} />
+                    ) : (
+                      <span className="text-[10px] text-text-muted italic">Sin pred.</span>
+                    )}
+                  </div>
+                ) : pred ? (
                   <div>
                     <ScoreBadge pred={pred} />
                     <p className="text-[10px] text-primary mt-0.5">✓ Guardada</p>
