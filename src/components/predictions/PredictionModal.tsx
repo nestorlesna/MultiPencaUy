@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, Lock } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { TeamFlag } from '../ui/TeamFlag'
 import { upsertPrediction, deletePrediction } from '../../services/predictionService'
@@ -125,6 +125,7 @@ export function PredictionModal({ match, existing, onClose }: Props) {
 
   const isKnockout = match.phase.has_extra_time
   const teamsConfirmed = !!(match.home_team?.is_confirmed && match.away_team?.is_confirmed)
+  const isLocked = new Date(match.match_datetime) <= new Date()
   const draw90 = form.homeScore === form.awayScore
   const showEt = isKnockout && draw90
   const drawEt = showEt && form.homeScoreEt === form.awayScoreEt
@@ -145,6 +146,33 @@ export function PredictionModal({ match, existing, onClose }: Props) {
           <p className="text-text-muted text-xs">
             Podrás ingresar tu predicción una vez que se definan los clasificados.
           </p>
+        </div>
+      ) : isLocked ? (
+        <div className="py-6 text-center space-y-3">
+          <Lock size={24} className="text-text-muted mx-auto" />
+          <p className="text-text-secondary text-sm font-medium">
+            Este partido ya comenzó
+          </p>
+          <p className="text-text-muted text-xs">
+            Las predicciones se bloquean al inicio del partido.
+          </p>
+          {existing ? (
+            <div className="mt-2 bg-surface-2 rounded-lg p-3 space-y-1">
+              <p className="text-[11px] text-text-muted">Tu predicción</p>
+              <p className="text-xl font-bold text-text-primary tabular-nums">
+                {existing.home_score} – {existing.away_score}
+              </p>
+              {existing.home_score_et !== null && (
+                <p className="text-xs text-text-muted">
+                  ET: {existing.home_score_et} – {existing.away_score_et}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-text-muted text-xs italic mt-2">
+              No habías ingresado ninguna predicción para este partido.
+            </p>
+          )}
         </div>
       ) : (
       <div className="space-y-5">
