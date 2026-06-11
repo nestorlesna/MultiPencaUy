@@ -100,8 +100,8 @@ export function AuthPage() {
     }
   }
 
-  // Si ya está logueado y activo, redirigir
-  if (user && isActive) return <Navigate to="/fixture" replace />
+  // Si ya está logueado y activo, redirigir (excepto en reset: la sesión recovery es legítima)
+  if (user && isActive && tab !== 'reset') return <Navigate to="/fixture" replace />
 
   async function handleResendConfirmation() {
     if (!pendingConfirmEmail) return
@@ -491,17 +491,19 @@ export function AuthPage() {
             </>
           )}
 
-          <div className="mt-4">
-            <Captcha
-              ref={captchaRef}
-              onSuccess={token => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken(null)}
-              onError={() => {
-                setError('Error al cargar la verificación de seguridad.')
-                setCaptchaToken(null)
-              }}
-            />
-          </div>
+          {tab !== 'reset' && (
+            <div className="mt-4">
+              <Captcha
+                ref={captchaRef}
+                onSuccess={token => setCaptchaToken(token)}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => {
+                  setError('Error al cargar la verificación de seguridad.')
+                  setCaptchaToken(null)
+                }}
+              />
+            </div>
+          )}
 
           {tab === 'register' && (
             <p className="text-[11px] text-text-muted text-center mt-4">
