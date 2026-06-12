@@ -3,6 +3,23 @@
 > **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-12 — decisiones del §10 resueltas
 > **Origen:** Evolución de PencaLes 2026 (repo clonado) hacia plataforma SaaS.
 
+## Avance global (2026-06-12)
+
+| Fase | Estado |
+|------|--------|
+| 0 · Preparación | 🟡 repo ordenado + branding en docs; falta crear Supabase/Vercel y renombrar paquete |
+| 1 · Schema + RLS | 🟡 escrito (01/02/03) — **sin probar contra DB** |
+| 2 · Auth, contexto y selector | ⬜ |
+| 3 · Refactor páginas de juego | ⬜ |
+| 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar |
+| 5 · Administración | ⬜ |
+| 6 · Integración y pulido | ⬜ |
+| 7 · Migración de datos | 🟡 script + guía listos; ejecución post-Mundial |
+| 8 · QA, seguridad y lanzamiento | ⬜ |
+
+**Próximo paso recomendado:** crear el proyecto Supabase nuevo y correr `01/02/03` para validar el
+esquema antes de empezar el frontend (Fase 2). Detalle por fase en §5.
+
 ---
 
 ## 1. Decisiones tomadas
@@ -294,28 +311,33 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 
 > Estimaciones en semanas-persona aproximadas. El Mundial termina 19/07; la meta es tener
 > el sistema listo para migrar a fin de julio y lanzar en agosto.
+>
+> **Leyenda:** ✅ hecho · 🟡 en progreso / parcial · ⬜ pendiente
+> Última actualización del avance: **2026-06-12**.
 
-### Fase 0 — Preparación (0.5 sem)
-- [ ] Crear proyecto Supabase nuevo (región us-east o sa-east según latencia UY)
-- [ ] Crear proyecto Vercel nuevo apuntando a este repo (§7)
-- [ ] Branding **"PencaLes 2.0"**: renombrar paquete (`pencales-2026` → `pencales-2`),
-      limpiar nombres hardcodeados (plantillas email, títulos, SMTP_FROM_NAME) — dominio a definir
-- [ ] Definir convención de migraciones: carpeta `supabase/migrations/` numerada desde cero
-  (el schema viejo `01..16_*.sql` queda como referencia en `supabase/legacy/`)
-- [ ] `.env.example` actualizado; ramas `main`/`develop` como hasta ahora
+### Fase 0 — Preparación (0.5 sem) — 🟡 parcial
+- ⬜ Crear proyecto Supabase nuevo (región sa-east, São Paulo, por latencia UY)
+- ⬜ Crear proyecto Vercel nuevo apuntando a este repo (§7)
+- 🟡 Branding **"PencaLes 2.0"**: README y CLAUDE.md actualizados; falta renombrar el paquete
+      (`pencales-2026` → `pencales-2`) y limpiar nombres hardcodeados (plantillas email, títulos,
+      SMTP_FROM_NAME) — dominio a definir
+- ✅ Convención de migraciones: `supabase/migrations/` numerada desde cero; v1 movida a
+      `supabase/legacy/` como referencia
+- 🟡 Repo reorganizado (SQL/HTML sueltos ordenados, RELEASE_GITHUB.md eliminado); falta
+      actualizar `.env.example`. Ramas `main`/`develop` operativas
 
-### Fase 1 — Schema núcleo + RLS (1.5 sem)
-- [ ] `01_platform.sql`: profiles, tenants, tenant_roles + trigger signup
-- [ ] `02_catalog.sql`: competitions, phases, groups, stadiums, teams, matches,
-      knockout_slot_rules, combinaciones, overrides (con `sort_order`, no `order`)
-- [ ] `03_tencomp.sql`: ten_comps, ten_comp_scoring, ten_comp_members, predictions,
-      bonus_*, subgrupos, audits, email_queue
-- [ ] `04_rls.sql`: funciones helper + todas las políticas (§3.6)
-- [ ] `05_views.sql`: group_standings, best_third_ranking, leaderboard, subgrupo_ranking
-- [ ] `06_seed_dev.sql`: tenant demo + competencia de prueba corta (8 equipos) para desarrollo
-- [ ] Tests de RLS con `supabase test db` o script de smoke (matriz rol × tabla × operación)
+### Fase 1 — Schema núcleo + RLS (1.5 sem) — 🟡 escrita, sin probar contra DB
+> Consolidado en 3 archivos (en vez de 01–06) para minimizar la cantidad de migraciones.
+- ✅ `01_schema.sql`: TODAS las tablas (plataforma + catálogo + Ten-Comps) + triggers de fila
+      (signup, updated_at, winner, auditoría, subgrupos). `sort_order` en vez de `order`
+- ✅ `02_rls.sql`: funciones helper (§3.6) + todas las políticas + Storage (buckets avatars/logos)
+- ✅ `03_functions_views.sql`: vistas (group_standings, best_third_ranking, leaderboard,
+      subgrupo_ranking) + RPCs + seed de `advancement_engines`
+- ⬜ Seed de desarrollo (tenant demo + competencia corta de prueba)
+- ⬜ **Probar 01/02/03 contra el Supabase nuevo** (cazar errores de sintaxis — no testeado aún)
+- ⬜ Tests de RLS (matriz rol × tabla × operación)
 
-### Fase 2 — Auth, contexto y selector (1 sem)
+### Fase 2 — Auth, contexto y selector (1 sem) — ⬜ pendiente
 - [ ] `useAuth` ampliado (super-admin, tenant roles)
 - [ ] `TenCompProvider` + `useTenComp()` + resolución de slug
 - [ ] Routing nuevo completo (`/p/:slug/*` + guards por rol)
@@ -323,7 +345,7 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 - [ ] Header/BottomNav dinámicos según `menu_config` + selector de penca activa
 - [ ] Flujo privado: banner "pendiente de aprobación" (puede predecir, no ve ranking propio en tabla)
 
-### Fase 3 — Refactor páginas de juego (2 sem)
+### Fase 3 — Refactor páginas de juego (2 sem) — ⬜ pendiente
 La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] `matchService`, `predictionService`, `groupService`, `teamService`,
       `leaderboardService`, `bonusService`, `subgrupoService` → reciben scope
@@ -333,15 +355,16 @@ La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] Mis Predicciones, Ranking (por Ten-Comp), Más Puntos, Subgrupos
 - [ ] Ayuda: render dinámico del scoring del Ten-Comp activo
 
-### Fase 4 — Motor de cálculo (1.5 sem)
-- [ ] `calculate_match_points` multi-Ten-Comp (un resultado → puntos en N pencas con N scorings)
-- [ ] `calculate_bonus_points` por Ten-Comp, idempotente
-- [ ] Motores de avance: dispatcher + `wc48_best_thirds` (port) — otros motores quedan para v1.1
-- [ ] `recalculate_all(competition_id)`
-- [ ] Tests de regresión: con los datos del Mundial migrados, los puntos deben dar **idénticos**
-      a producción actual (este test es también la validación de la migración, §6.5)
+### Fase 4 — Motor de cálculo (1.5 sem) — 🟡 escrito junto al schema, sin probar
+> El SQL se escribió en `03_functions_views.sql` durante la Fase 1.
+- ✅ `calculate_match_points` multi-Ten-Comp (lee `ten_comp_scoring` de cada penca)
+- ✅ `calculate_bonus_points(competition_id)` por Ten-Comp, idempotente
+- ✅ Motores de avance: dispatcher `populate_knockout` + `engine_wc48_best_thirds` (port)
+- ✅ `recalculate_all(competition_id)` + `set_match_result(...)` (orquestación)
+- ⬜ Tests de regresión: con datos del Mundial migrados, los puntos deben dar **idénticos**
+      a producción (es también la validación de la migración, §6.5) — requiere DB con datos
 
-### Fase 5 — Administración (2 sem)
+### Fase 5 — Administración (2 sem) — ⬜ pendiente
 - [ ] Super-admin: CRUD tenants + asignación de admins
 - [ ] Super-admin: CRUD competencias (wizard: datos → fases → grupos → equipos → partidos →
       reglas de avance → scoring/menú default) + `clone_competition`
@@ -353,7 +376,7 @@ La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] Admin Ten-Comp: aprobaciones de miembros, editar scoring, editar menú, cerrar/archivar
 - [ ] Auditoría y Usuarios adaptados a multi-tenant; Correos con scope tenant
 
-### Fase 6 — Integración y pulido (1 sem)
+### Fase 6 — Integración y pulido (1 sem) — ⬜ pendiente
 - [ ] Emails multi-tenant (plantillas con nombre del Ten-Comp; `api/` serverless adaptado)
 - [ ] ResultAutoPage (APIs externas) con mapeo por competencia
 - [ ] Capacitor: misma app, el selector resuelve el multi-tenant. **Sin stores en v1**:
@@ -362,9 +385,12 @@ La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] Revisión de performance: índices (`predictions(ten_comp_id, match_id)`,
       `ten_comp_members(user_id)`, `matches(competition_id, match_datetime)`)
 
-### Fase 7 — Migración de datos (§6) (1 sem, post 19/07)
+### Fase 7 — Migración de datos (§6) (1 sem, post 19/07) — 🟡 script y guía listos
+- ✅ Script SQL `90_migrate_from_v1.sql` (transforma `legacy.*` → v2, UUIDs preservados)
+- ✅ Guía de ejecución paso a paso `docs/MIGRACION_V1_A_V2.md` (autocontenida)
+- ⬜ Ejecución real + validación (post-Mundial, requiere ambos proyectos Supabase)
 
-### Fase 8 — QA, seguridad y lanzamiento (1 sem)
+### Fase 8 — QA, seguridad y lanzamiento (1 sem) — ⬜ pendiente
 - [ ] Pentest casero: matriz RLS completa, intentos de escalación, join_code brute-force
       (rate limit en RPC), manipulación de reloj
 - [ ] Carga de prueba: 1 competencia × 10 Ten-Comps × 500 usuarios simulados
