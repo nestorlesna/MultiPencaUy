@@ -2,16 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project
+## Proyecto
 
-**PencaLes 2026** — FIFA World Cup 2026 prediction pool web app. Users register, predict match results, earn points, and compete on a leaderboard. Deployed on Vercel (frontend) + Supabase (PostgreSQL backend, auth, storage).
+**PencaLes 2.0** — Plataforma SaaS multi-tenant de pencas deportivas.
+Plan completo de desarrollo y migración: [`docs/PLAN_MULTITENANT.md`](docs/PLAN_MULTITENANT.md)
 
-Tournament data: 48 teams · 12 groups (A–L) · 104 matches · 16 stadiums · June 11 – July 19, 2026.
+**Estado actual:** Desarrollo de v2 (multi-tenant). La v1 (PencaLes 2026, Mundial FIFA) corre en producción hasta 19/07/2026; su schema SQL está en `supabase/legacy/` solo como referencia.
 
-## Commands
+### Modelo conceptual
+
+```
+Tenant (empresa)
+  └── Ten-Comp (tenant × competencia = unidad de participación)
+        ├── Competencia (catálogo global: equipos, partidos, resultados)
+        ├── Miembros (predicen en este Ten-Comp)
+        ├── Scoring propio (copiado de la competencia, editable)
+        ├── Ranking (solo suma puntos de este Ten-Comp)
+        ├── Bonus (opt-in por Ten-Comp, tipos definidos por competencia)
+        └── Subgrupos (mini-ligas dentro del Ten-Comp)
+```
+
+**Ten-Comp público:** acceso inmediato al ranking.
+**Ten-Comp privado:** código de 8 letras A-Z → puede predecir al instante, aparece en ranking solo tras aprobación del admin.
+
+### Roles
+
+| Rol | Alcance |
+|-----|---------|
+| Super-admin | Toda la plataforma: tenants, competencias, resultados |
+| Admin de tenant | Sus Ten-Comps, scoring, menú, aprobaciones de miembros, asignar cargadores |
+| Cargador | Carga resultados de competencias usadas por su tenant (resultado es compartido) |
+| Usuario | Se une a Ten-Comps, predice, ve rankings |
+
+Los admins de tenant siempre son también cargadores.
+
+## Comandos
 
 ```bash
-npm run dev      # Vite dev server on port 5173
+npm run dev      # Vite dev server en puerto 5173
 npm run build    # tsc && vite build
 npm run lint     # eslint . --ext ts,tsx
 npm run preview  # Preview production build
@@ -21,46 +49,37 @@ npm run preview  # Preview production build
 
 | Layer | Choice |
 |-------|--------|
-| Framework | React 18 + TypeScript |
-| Build | Vite 5 |
-| Styling | Tailwind CSS 3 + custom theme (dark, see below) |
+| Framework | React 19 + TypeScript |
+| Build | Vite 8 |
+| Styling | Tailwind CSS 3 + custom theme (dark) |
 | Icons | Lucide React |
-| Routing | React Router v6 (nested Layout) |
+| Routing | React Router v7 (nested Layout) |
 | Data fetching | TanStack Query v5 |
-| Backend | Supabase (PostgreSQL + Auth + Storage + Realtime) |
+| Backend | Supabase (PostgreSQL + Auth + Storage) |
 | Toasts | Sonner |
-| Dates | date-fns with `es` locale |
+| Dates | date-fns con `es` locale |
+| Mobile | Capacitor 8 (Android / web, sin stores) |
 
 ## Design System
 
-Dark theme, modern and minimalist. All values go in `tailwind.config.js`:
+Dark theme, modern y minimalista. Todos los valores en `tailwind.config.js`:
 
 ```js
 colors: {
-  background: '#0B0F1A',   // app background
-  surface:    '#141925',   // cards, panels
-  border:     '#1E2535',   // dividers, borders
-  primary: {
-    DEFAULT: '#10B981',    // emerald — main CTA, highlights
-    hover:   '#059669',
-  },
-  accent: {
-    DEFAULT: '#F59E0B',    // amber/gold — rankings, trophies
-    hover:   '#D97706',
-  },
-  text: {
-    primary:   '#F8FAFC',
-    secondary: '#94A3B8',
-    muted:     '#475569',
-  },
+  background: '#0B0F1A',
+  surface:    '#141925',
+  border:     '#1E2535',
+  primary: { DEFAULT: '#10B981', hover: '#059669' },   // emerald
+  accent:  { DEFAULT: '#F59E0B', hover: '#D97706' },   // amber/gold
+  text: { primary: '#F8FAFC', secondary: '#94A3B8', muted: '#475569' },
 }
 ```
 
-Font: Inter. Spanish language throughout UI and route paths.
+Font: Inter. UI y rutas en español.
 
-## Architecture
+## Arquitectura
 
-### Directory layout
+### Estructura de directorios
 
 ```
 src/
@@ -68,67 +87,66 @@ src/
 ├── App.tsx               # BrowserRouter + Routes
 ├── index.css             # Tailwind globals
 ├── components/
-│   ├── ui/               # Reusable: Modal, Badge, Button, Input, TeamFlag, etc.
+│   ├── ui/               # Modal, Badge, Button, Input, TeamFlag, etc.
 │   ├── layout/           # Layout.tsx, BottomNav.tsx, Header.tsx
 │   ├── admin/            # ResultForm
 │   ├── groups/           # GroupTable
 │   └── matches/          # MatchCard, PredictionModal
+├── hooks/                # useAuth, useTenComp (contexto activo), useMatches, etc.
 ├── pages/
+│   ├── PencasPage.tsx         # /pencas — home: mis Ten-Comps, explorar públicos, unirse
 │   ├── FixturePage.tsx
 │   ├── GruposPage.tsx / GrupoDetailPage.tsx / EquipoPage.tsx
-│   ├── BracketPage.tsx       # /cuadro — visual knockout bracket
+│   ├── BracketPage.tsx
 │   ├── RankingPage.tsx
-│   ├── MasPuntosPage.tsx     # /mas-puntos — bonus predictions
+│   ├── MasPuntosPage.tsx
 │   ├── MisPrediccionesPage.tsx
+│   ├── SubgruposPage.tsx / SubgrupoDetailPage.tsx
 │   ├── AyudaPage.tsx
 │   ├── AuthPage.tsx / PerfilPage.tsx / NotFoundPage.tsx
-│   └── admin/
-│       ├── ResultadosPage.tsx
-│       ├── PartidosAdminPage.tsx
-│       ├── EquiposAdminPage.tsx
-│       ├── TercerosPage.tsx
-│       ├── UsuariosPage.tsx
-│       ├── AuditoriaPage.tsx
-│       └── ConfigPage.tsx
-├── hooks/                # useAuth, usePredictions, useStandings, etc.
-├── services/             # Supabase query functions (not hooks)
+│   └── admin/            # ResultadosPage, PartidosAdminPage, etc.
+├── services/             # Funciones de query Supabase (no hooks)
 │   ├── matchService.ts
 │   ├── predictionService.ts
-│   ├── bonusService.ts       # bonus predictions + calculate_bonus_points RPC
-│   ├── adminService.ts       # setMatchResult, calculateMatchPoints (calls bonus too)
+│   ├── bonusService.ts
+│   ├── adminService.ts
 │   ├── leaderboardService.ts
-│   ├── auditService.ts
-│   ├── teamService.ts
-│   └── groupService.ts
+│   └── ...
 ├── lib/
 │   └── supabase.ts       # Supabase client singleton
-├── types/                # Shared TypeScript interfaces
+├── types/                # Interfaces TypeScript compartidas
 └── utils/
     ├── constants.ts
-    └── formatters.ts     # Date, score, duration formatters (es locale)
+    └── formatters.ts
+
+supabase/
+├── legacy/         # Scripts v1 (PencaLes 2026) — SOLO REFERENCIA para migración ETL
+├── migrations/     # Migraciones v2 numeradas desde cero (se llenan en Fase 1)
+└── email-templates/ # resetpass.html, verificar.html
 ```
 
-### Routing (Spanish paths)
+### Routing (rutas en español)
 
 ```
-/                     → redirect to /fixture
-/fixture              → Full schedule, filterable by phase/group/date
-/grupos               → All 12 groups; tabs "Grupos del Torneo" (official) / "Mis Grupos" (virtual standings from user predictions)
-/grupos/:grupo        → Group detail + matches; ?vista=mias shows user's predicted standings/scores
-/equipos/:id          → Team profile
-/cuadro               → Visual knockout bracket (R32 → Final)
-/mis-predicciones     → Logged-in user's predictions + points history
-/mas-puntos           → Bonus predictions (podio, draws count, goal range, etc.)
-/ranking              → Global leaderboard (match points + bonus points)
-/perfil               → Edit profile + avatar
-/ayuda                → Scoring rules + bonus rules with live examples
-/admin/resultados     → Enter match results (admin only)
-/admin/partidos       → Edit match data — datetime, teams, stadium (admin only)
-/admin/equipos        → Edit team data — name, flag, abbreviation (admin only)
-/admin/terceros       → Best-thirds ranking table (admin only)
-/admin/usuarios       → Approve/deactivate users (admin only)
-/admin/auditoria      → Prediction change log with filters (admin only)
-/admin/config         → Scoring config (admin only)
+/                     → redirect a /pencas
+/pencas               → home: mis Ten-Comps + explorar públicos + unirse por código
+/perfil               → perfil global del usuario
+/auth, /auth-callback → login/registro
+
+/p/:slug/             → contexto de un Ten-Comp (redirect a /p/:slug/fixture)
+/p/:slug/fixture
+/p/:slug/grupos[/:grupo]
+/p/:slug/cuadro
+/p/:slug/ranking
+/p/:slug/mis-predicciones
+/p/:slug/mas-puntos
+/p/:slug/subgrupos[/:id]
+/p/:slug/ayuda
+/p/:slug/admin/*      → admin del Ten-Comp
+
+/t/:tenantSlug/admin  → admin del tenant
+
+/admin/*              → super-admin (tenants, competencias, resultados, usuarios)
 ```
 
 ### Supabase client
@@ -142,103 +160,71 @@ export const supabase = createClient(
 )
 ```
 
-### Auth & Authorization
+### Auth y autorización
 
 - Supabase Auth (email/password)
-- `profiles` table mirrors `auth.users` — created via trigger on signup
-- `profiles.is_active` = true by default (created via signup trigger) — users can predict immediately, no admin approval step; admin can deactivate from Admin → Usuarios
-- `profiles.is_admin` = false by default
-- `profiles.is_loader` = false by default — can load match results without full admin access (added in `11_loader_role.sql`)
-- RLS policies: public read on fixture data; predictions are user-owned; admin writes via `is_admin` check
-- Self profile edits (`profiles_editar_propio`) cannot change `is_admin` / `is_active` / `is_loader` — enforced in the policy's WITH CHECK (see `11_loader_role.sql` / `14_security_fixes.sql`)
-- Prediction lock: RLS uses server-side `now()` vs `match_datetime` — immune to client clock manipulation
+- `profiles` espeja `auth.users` — creado por trigger en signup
+- Roles via `tenant_roles(tenant_id, user_id, role)` — no flags booleanos en profiles
+- `is_super_admin` en profiles para acceso a toda la plataforma
+- RLS usa funciones helper `SECURITY DEFINER`: `is_super_admin()`, `is_tenant_admin(tenant_id)`, `is_tenant_loader(tenant_id)`, `is_approved_member(ten_comp_id)`
+- Lock de predicciones: RLS usa `now()` del servidor — inmune a manipulación de reloj
 
-### Key database tables
+### Tablas principales v2
 
-| Table | Purpose |
-|-------|---------|
-| `groups` | A–L, order 1–12 |
-| `phases` | Group/R32/R16/QF/SF/3rd/Final with has_extra_time flag |
-| `stadiums` | 16 venues with city, country, address, photo_urls[] |
-| `teams` | 48 teams; is_confirmed=false + placeholder for 6 TBD slots |
-| `matches` | 104 matches; home/away nullable; slot_label for TBD display (e.g. "1A", "W73") |
-| `knockout_slot_rules` | Defines how knockout matchups are calculated (group_position / match_winner / best_third / match_loser) |
-| `profiles` | Auth user profiles; is_active, is_admin flags |
-| `predictions` | User predictions; UNIQUE(user_id, match_id); locked when match starts |
-| `scoring_config` | Parametric points: exact_score, correct_winner, correct_draw, et_exact, pk_winner, knockout_bonus |
-| `predictions_audit` | INSERT/UPDATE audit log for predictions (SECURITY DEFINER trigger) |
-| `bonus_config` | Points per bonus type (podio_exacto, podio_presencia, empates_grupos, rango_goles, final_cero, top_scorer_team, top_group_goals) |
-| `bonus_predictions` | One row per user; all 6 bonus answers stored as nullable columns |
-| `bonus_points` | UNIQUE(user_id, bonus_type); updated by calculate_bonus_points() |
-| `bonus_predictions_audit` | Audit log for bonus prediction changes |
+| Tabla | Propósito |
+|-------|-----------|
+| `profiles` | Usuarios globales; `is_super_admin`, `is_active` |
+| `tenants` | Empresas; `slug`, `plan`, `max_ten_comps`, `max_members_per_ten_comp` |
+| `tenant_roles` | Rol (admin/loader) por usuario por tenant |
+| `competitions` | Catálogo: torneos deportivos con `advancement_engine` y defaults de scoring/menú/bonus |
+| `competition_bonus_types` | Tipos de bonus y puntos default por competencia |
+| `phases` | Fases de la competencia (con `competition_id`) |
+| `groups` | Grupos (con `competition_id`) |
+| `stadiums` | Estadios (con `competition_id`) |
+| `teams` | Equipos (con `competition_id`) |
+| `matches` | Partidos con resultados (con `competition_id`); resultados compartidos entre Ten-Comps |
+| `knockout_slot_rules` | Reglas de cruce knockout por competencia |
+| `advancement_engines` | Catálogo de motores de avance (v1: solo `wc48_best_thirds`) |
+| `ten_comps` | Instancias tenant×competencia; `slug`, `visibility`, `join_code`, `bonus_enabled` |
+| `ten_comp_scoring` | Scoring editable por Ten-Comp |
+| `ten_comp_members` | Membresías con status `pending`/`approved`/`blocked` |
+| `predictions` | Predicciones scoped a `(ten_comp_id, user_id, match_id)` |
+| `bonus_config` | Puntos de bonus por Ten-Comp (copiado de competition_bonus_types) |
+| `bonus_predictions` | Respuestas de bonus por Ten-Comp |
+| `bonus_points` | Puntos ganados por bonus por Ten-Comp |
+| `subgrupos` / `subgrupo_members` | Mini-ligas dentro de un Ten-Comp |
+| `predictions_audit` | Log de cambios en predicciones |
 
-**Views (calculated in SQL):**
-- `group_standings` — PJ/PG/PE/PP/GF/GC/GD/Pts per team, ranked within group by FIFA criteria
-- `best_third_ranking` — 12 third-place teams ranked for R32 qualification
-- `leaderboard` — total points (predictions.points_earned + bonus_points.points_earned) + rank
+### Servicios — convención importante
 
-### SQL files execution order
+Todos los servicios en `src/services/` reciben scope **explícito** como parámetro:
+- Funciones de competencia reciben `competitionId`
+- Funciones de Ten-Comp reciben `tenCompId`
+- Nunca leen contexto desde el módulo — la separación servicios/hooks se mantiene
 
-```
-01_schema.sql          # base tables
-02_auth_rls.sql        # RLS policies
-03_views_functions.sql # views + calculate_match_points() + populate_knockout_matches()
-04_seed.sql            # optional test data
-05_storage.sql         # Storage buckets
-06_audit.sql           # predictions_audit table + trigger
-07_bonus.sql           # bonus tables + calculate_bonus_points() + updated leaderboard view
-08_group_overrides.sql # manual group standing overrides
-09_combinaciones.sql   # FIFA best-thirds combination table + populate_knockout rewrite
-10_recalculate_all.sql # recalculate_all() RPC
-11_loader_role.sql     # is_loader column + matches/profiles RLS update
-12_subgrupos.sql       # subgrupos (private mini-leagues) tables + RLS + views
-13_admin_functions.sql # admin_get_user_details() RPC
-14_security_fixes.sql  # RLS hardening: block is_loader self-escalation + server-side bonus lock
-15_security_fixes_2.sql # profiles auth-only read, private subgrupos (member-only), explicit WITH CHECK
-16_rpc_authorization.sql # role guard on SECURITY DEFINER RPCs (admin/loader for result flow; admin-only for group preds). Authoritative final form of those 5 functions.
-```
+### Motor de avance (advancement_engine)
 
-Standalone (run after their dependencies): `08_email_queue.sql`, `08b_group_predictions_rpc.sql`, `08c_match_predictions_rpc.sql`.
+Los cruces knockout se calculan via un dispatcher SQL que llama a la función configurada en `competitions.advancement_engine`. En v1 solo existe `wc48_best_thirds` (Mundial 48 equipos + mejores terceros, port de los scripts legacy). El dispatcher queda implementado para agregar motores sin tocar el resto del sistema.
 
-`00_reset_init.sql` — full reset + complete tournament data (groups, phases, stadiums, 48 teams, 104 matches, 64 knockout rules). Requires `nestor.lesna@gmail.com` in auth.users; that user becomes the admin.
+### Flujo de cálculo de puntos
 
-### Prediction model for knockout matches
+1. Cargador (admin/loader de tenant) carga resultado → RPC `set_match_result(competition_id, match_id, ...)`
+2. RPC `calculate_match_points(match_id)` itera **todos los Ten-Comps** de esa competencia y aplica el scoring propio de cada uno
+3. RPC `calculate_bonus_points(competition_id)` — idempotente, corre por cada Ten-Comp con `bonus_enabled = true`
+4. El resultado es un hecho deportivo compartido; los puntos son por Ten-Comp
 
-Group phase: predict `home_score` + `away_score` (90 min only).
+### Known gotcha: columna `sort_order` (antes `order`)
 
-Knockout phase: progressive UI —
-1. User always predicts 90min score
-2. If predicted 90min is a draw → show ET fields (additional goals in ET)
-3. If ET also draw → show penalty winner selector
+En v2 la columna se renombró a `sort_order` para evitar el conflicto con el parámetro reservado `order` de PostgREST. Ya no es necesario el workaround de filtrado client-side que existía en `matchService.ts` de la v1.
 
-Points are awarded independently per layer (90min correct, ET correct, PK correct).
+### Bonus por Ten-Comp
 
-### Knockout bracket structure
+Los tipos de bonus (podio, empates, rango de goles, etc.) se definen por competencia en `competition_bonus_types`. Al crear un Ten-Comp se copian a `bonus_config` si `bonus_enabled = true`. El tenant-admin puede editar los puntos pero no agregar tipos. Si `bonus_enabled = false`, el Ten-Comp no tiene sección de bonus.
 
-Left half (feeds SF M101 → Final M104):
-- R32: M73,M74,M75,M77 → R16: M89,M90 → QF: M97
-- R32: M81,M82,M83,M84 → R16: M93,M94 → QF: M98
+### Migración de datos (post 19/07/2026)
 
-Right half (feeds SF M102 → Final M104):
-- R32: M76,M78,M79,M80 → R16: M91,M92 → QF: M99
-- R32: M85,M86,M87,M88 → R16: M95,M96 → QF: M100
+ETL desde proyecto Supabase v1 al nuevo. Script Node/TS con dos conexiones. Los UUIDs de `auth.users` se preservan (pg_dump del schema auth con passwords). Validación: `recalculate_all()` en el nuevo sistema debe reproducir el leaderboard final de producción fila a fila.
 
-Third place: M103 (losers of M101 and M102). Final: M104.
+Tenant de migración: **"Publico"** · Competencia: **"Mundial Futbol 2026"** · Ten-Comp: **"PencaLes 2026"** (público, archivado).
 
-### Score calculation flow
-
-1. Admin loads result via `ResultForm` → calls `setMatchResult()` + `calculateMatchPoints()` in `adminService.ts`
-2. `calculateMatchPoints()` calls Supabase RPC `calculate_match_points(match_id)` which iterates all predictions for that match and awards points based on `scoring_config`
-3. After that, `calculateMatchPoints()` also calls RPC `calculate_bonus_points()` — idempotent, checks conditions internally:
-   - Group-stage bonuses (empates_grupos, top_group_goals): triggered when all 72 group matches are finished
-   - Final bonuses (podio, rango_goles, final_cero, top_scorer_team): triggered when M103 and M104 are both finished
-
-### Known gotcha: PostgREST reserved word `order`
-
-The `phases` table has a column named `order` which conflicts with PostgREST's `order` query parameter. Never use `.eq('order', value)` — it will be interpreted as ORDER BY instead of a WHERE filter. Workaround (already implemented in `matchService.ts`): fetch all phases and filter client-side.
-
-### Bonus predictions locking
-
-Bonus predictions are locked once the tournament has started (any match's `match_datetime <= now()`). Enforced in **two layers**:
-- Client-side UX gate in `MasPuntosPage` via `isTournamentStarted()`.
-- **Server-side RLS** (`bonus_pred_own_insert` / `bonus_pred_own_update` in `07_bonus.sql`, hardened in `14_security_fixes.sql`): the WITH CHECK rejects writes when `EXISTS (SELECT 1 FROM matches WHERE match_datetime <= now())`. Uses server `now()` — immune to client clock manipulation, like the per-match prediction lock.
+Ver plan completo: `docs/PLAN_MULTITENANT.md`
