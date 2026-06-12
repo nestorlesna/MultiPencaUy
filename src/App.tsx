@@ -38,6 +38,8 @@ import { PencasPage } from './pages/PencasPage'
 import { TenCompLayout } from './components/tencomp/TenCompLayout'
 import { PencaDashboardPage } from './pages/penca/PencaDashboardPage'
 import { PencaPlaceholderPage } from './pages/penca/PencaPlaceholderPage'
+import { PencaFixturePage } from './pages/penca/PencaFixturePage'
+import { PencaRankingPage } from './pages/penca/PencaRankingPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,11 +78,11 @@ function AppContent() {
             <Route path="pencas"            element={<PencasPage />} />
             <Route path="p/:slug"           element={<TenCompLayout />}>
               <Route index                  element={<PencaDashboardPage />} />
-              <Route path="fixture"         element={<PencaPlaceholderPage title="Fixture" />} />
+              <Route path="fixture"         element={<PencaFixturePage />} />
               <Route path="grupos"          element={<PencaPlaceholderPage title="Grupos" />} />
               <Route path="grupos/:grupo"   element={<PencaPlaceholderPage title="Grupo" />} />
               <Route path="cuadro"          element={<PencaPlaceholderPage title="Cuadro" />} />
-              <Route path="ranking"         element={<PencaPlaceholderPage title="Ranking" />} />
+              <Route path="ranking"         element={<PencaRankingPage />} />
               <Route path="mis-predicciones" element={<PencaPlaceholderPage title="Mis predicciones" />} />
               <Route path="mas-puntos"      element={<PencaPlaceholderPage title="+ Puntos" />} />
               <Route path="subgrupos"       element={<PencaPlaceholderPage title="Subgrupos" />} />

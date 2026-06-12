@@ -10,7 +10,7 @@
 | 0 · Preparación | 🟡 repo ordenado + branding en docs; falta crear Supabase/Vercel y renombrar paquete |
 | 1 · Schema + RLS | 🟡 escrito (01/02/03) — **sin probar contra DB** |
 | 2 · Auth, contexto y selector | 🟡 scaffolding aditivo (flag `VITE_V2_ENABLED`); build OK, sin probar contra backend |
-| 3 · Refactor páginas de juego | ⬜ |
+| 3 · Refactor páginas de juego | 🟡 primer slice: servicios v2 + Ranking + Fixture (read-only) |
 | 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar |
 | 5 · Administración | ⬜ |
 | 6 · Integración y pulido | ⬜ |
@@ -354,15 +354,26 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 > `components/tencomp/{TenCompLayout,MembershipBanner}.tsx`, `pages/PencasPage.tsx`,
 > `pages/penca/{PencaDashboardPage,PencaPlaceholderPage}.tsx`. Flag `VITE_V2_ENABLED` en `.env.example`.
 
-### Fase 3 — Refactor páginas de juego (2 sem) — ⬜ pendiente
-La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
-- [ ] `matchService`, `predictionService`, `groupService`, `teamService`,
-      `leaderboardService`, `bonusService`, `subgrupoService` → reciben scope
-- [ ] Fixture, Grupos (+ "Mis Grupos" virtual), Detalle grupo, Equipo
-- [ ] Cuadro (bracket) — `virtualBracket.ts` parametrizado por estructura de la competencia
-      (hoy asume M73–M104 hardcodeado → leer de knockout_slot_rules)
-- [ ] Mis Predicciones, Ranking (por Ten-Comp), Más Puntos, Subgrupos
-- [ ] Ayuda: render dinámico del scoring del Ten-Comp activo
+### Fase 3 — Refactor páginas de juego (2 sem) — 🟡 primer slice (servicios v2 + Ranking + Fixture)
+> Patrón establecido: servicios v2 nuevos en `src/services/v2/` (schema con `competition_id`/
+> `ten_comp_id`, alias `order:sort_order`), consumidos por páginas scoped vía `useTenComp()`.
+> Los servicios/páginas v1 quedan intactos (app viva). `npm run build` pasa.
+- 🟡 Servicios scoped: `v2/leaderboardService` (por ten_comp) y `v2/matchService`
+      (matches/phases/groups por competencia) ✅. Faltan `prediction`, `group`, `team`,
+      `bonus`, `subgrupo`
+- ✅ **Ranking** scoped (`PencaRankingPage`) — vista extraída a `components/leaderboard/LeaderboardView`
+      (compartida con la `RankingPage` v1, refactor sin cambio de render)
+- 🟡 **Fixture** scoped (`PencaFixturePage`) — read-only con tabs de fase y filtro de grupo
+      dinámicos; faltan predicción y modales (estadio/apuestas)
+- ⬜ Grupos (+ "Mis Grupos" virtual), Detalle grupo, Equipo
+- ⬜ Cuadro (bracket) — `virtualBracket.ts` parametrizado (hoy asume M73–M104 hardcodeado →
+      leer de `knockout_slot_rules`)
+- ⬜ Mis Predicciones, Más Puntos, Subgrupos
+- ⬜ Ayuda: render dinámico del scoring del Ten-Comp activo
+
+> Archivos nuevos: `services/v2/{leaderboardService,matchService}.ts`,
+> `components/leaderboard/LeaderboardView.tsx`, `pages/penca/{PencaRankingPage,PencaFixturePage}.tsx`.
+> Rutas `/p/:slug/{ranking,fixture}` ya no son placeholder.
 
 ### Fase 4 — Motor de cálculo (1.5 sem) — 🟡 escrito junto al schema, sin probar
 > El SQL se escribió en `03_functions_views.sql` durante la Fase 1.
