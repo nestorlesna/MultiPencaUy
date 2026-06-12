@@ -379,16 +379,21 @@ Fases 7–8 después del 19/07.
 
 ## 6. Plan de migración de datos (PencaLes 2026 → MultiPenca)
 
+> **Implementado.** La migración es **SQL** (no Node/TS): se restaura la v1 en un schema `legacy`
+> del proyecto nuevo y un único script la transforma. Artefactos:
+> - `supabase/migrations/90_migrate_from_v1.sql` — el script de transformación
+> - `docs/MIGRACION_V1_A_V2.md` — guía de ejecución paso a paso (autocontenida, para meses después)
+
 ### 6.1 Principios
 
 1. **Se ejecuta post-Mundial** con datos congelados (proyecto viejo en solo-lectura).
-2. **Se preservan los UUIDs de usuarios** (`auth.users.id`): las FKs de predicciones y perfiles
-   migran sin remapeo. Todo lo demás (matches, teams, etc.) puede recibir IDs nuevos con
-   tabla de mapeo `mig_id_map(old_id, new_id, entity)`.
-3. **Script idempotente** (Node/TS con dos conexiones Postgres directas, service-role),
-   ejecutable por entidad, con dry-run y reporte.
+2. **Se preservan TODOS los UUIDs** (no solo los de usuarios): `auth.users`, perfiles, equipos,
+   partidos, predicciones, etc. Como el proyecto nuevo está vacío no hay colisión, y las FKs
+   migran sin tabla de mapeo. La única columna nueva es el scope (`competition_id` / `ten_comp_id`).
+3. **Script SQL idempotente** (`ON CONFLICT DO NOTHING/UPDATE`), re-ejecutable. Lee de `legacy.*`,
+   escribe en `public.*`. Anclas con UUID fijos para tenant/competencia/Ten-Comp.
 4. **Validación = recálculo**: tras migrar, `recalculate_all()` en el nuevo sistema debe
-   reproducir exactamente el leaderboard final de producción.
+   reproducir exactamente el leaderboard final de producción (diff fila a fila = 0).
 
 ### 6.2 Mapeo de entidades
 

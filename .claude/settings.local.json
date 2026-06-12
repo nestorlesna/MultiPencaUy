@@ -37,7 +37,9 @@
       "Bash(xargs cat *)",
       "Bash(git -C \"C:\\\\DATOS\\\\DESARROLLOS\\\\React\\\\MultiPencaUy\" status)",
       "Bash(git -C \"C:\\\\DATOS\\\\DESARROLLOS\\\\React\\\\MultiPencaUy\" diff --stat)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(git rm *)",
+      "Bash(rm -f supabase/migrations/.gitkeep)"
     ]
   }
 }
