@@ -9,7 +9,7 @@
 |------|--------|
 | 0 · Preparación | 🟡 repo ordenado + branding en docs; falta crear Supabase/Vercel y renombrar paquete |
 | 1 · Schema + RLS | 🟡 escrito (01/02/03) — **sin probar contra DB** |
-| 2 · Auth, contexto y selector | ⬜ |
+| 2 · Auth, contexto y selector | 🟡 scaffolding aditivo (flag `VITE_V2_ENABLED`); build OK, sin probar contra backend |
 | 3 · Refactor páginas de juego | ⬜ |
 | 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar |
 | 5 · Administración | ⬜ |
@@ -337,13 +337,22 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 - ⬜ **Probar 01/02/03 contra el Supabase nuevo** (cazar errores de sintaxis — no testeado aún)
 - ⬜ Tests de RLS (matriz rol × tabla × operación)
 
-### Fase 2 — Auth, contexto y selector (1 sem) — ⬜ pendiente
-- [ ] `useAuth` ampliado (super-admin, tenant roles)
-- [ ] `TenCompProvider` + `useTenComp()` + resolución de slug
-- [ ] Routing nuevo completo (`/p/:slug/*` + guards por rol)
-- [ ] Página **Mis Pencas**: mis Ten-Comps, explorar públicos, unirse por código (RPC)
-- [ ] Header/BottomNav dinámicos según `menu_config` + selector de penca activa
-- [ ] Flujo privado: banner "pendiente de aprobación" (puede predecir, no ve ranking propio en tabla)
+### Fase 2 — Auth, contexto y selector (1 sem) — 🟡 scaffolding aditivo, sin probar contra backend
+> Construido de forma **aditiva** y gateado por `VITE_V2_ENABLED`: convive con las rutas v1
+> sin alterar la app viva. `npm run build` pasa. Falta probar contra el Supabase v2.
+- ✅ `useAuth` ampliado: `isSuperAdmin`, `tenantRoles`, `isTenantAdmin()`, `isTenantLoader()`
+      (consulta a `tenant_roles` solo si el flag está activo)
+- ✅ `TenCompProvider` + `useTenComp()`/`useTenCompState()` + `resolveTenCompBySlug`
+- ✅ Página **Mis Pencas** (`/pencas`): mis Ten-Comps, explorar públicos, unirse por código (RPCs)
+- ✅ Flujo privado: `MembershipBanner` "pendiente de aprobación" (puede predecir, fuera del ranking)
+- 🟡 Routing `/p/:slug/*` con `TenCompLayout` + navegación dinámica según `menu_config`;
+      las secciones de juego son placeholders hasta la Fase 3. Guard de admin parcial
+- ⬜ Selector de penca en el header global (se difiere: el header v1 no se toca hasta el corte;
+      por ahora el cambio de penca es vía `/pencas`)
+
+> Archivos nuevos: `types/tenant.ts`, `services/tenCompService.ts`, `contexts/TenCompContext.tsx`,
+> `components/tencomp/{TenCompLayout,MembershipBanner}.tsx`, `pages/PencasPage.tsx`,
+> `pages/penca/{PencaDashboardPage,PencaPlaceholderPage}.tsx`. Flag `VITE_V2_ENABLED` en `.env.example`.
 
 ### Fase 3 — Refactor páginas de juego (2 sem) — ⬜ pendiente
 La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.

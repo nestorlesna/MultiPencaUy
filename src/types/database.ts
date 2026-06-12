@@ -144,6 +144,7 @@ export interface Profile {
   is_active: boolean  // true por defecto al registrarse; el admin puede desactivar
   is_admin: boolean
   is_loader: boolean  // puede cargar resultados, sin acceso al resto del admin
+  is_super_admin?: boolean // v2: acceso total a la plataforma (ausente en datos v1)
   created_at: string
 }
 

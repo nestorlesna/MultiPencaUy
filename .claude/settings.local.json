@@ -39,7 +39,9 @@
       "Bash(git -C \"C:\\\\DATOS\\\\DESARROLLOS\\\\React\\\\MultiPencaUy\" diff --stat)",
       "Bash(git *)",
       "Bash(git rm *)",
-      "Bash(rm -f supabase/migrations/.gitkeep)"
+      "Bash(rm -f supabase/migrations/.gitkeep)",
+      "Bash(npx eslint *)",
+      "Bash(echo \"=== exit: $? ===\")"
     ]
   }
 }
