@@ -34,7 +34,10 @@
       "PowerShell(.\\\\scripts\\\\release.ps1 1.0.26 \"Mejora en descarga de actualizaciones y fix login Google en web\")",
       "Bash(git stash *)",
       "Bash(npx patch-package *)",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(git -C \"C:\\\\DATOS\\\\DESARROLLOS\\\\React\\\\MultiPencaUy\" status)",
+      "Bash(git -C \"C:\\\\DATOS\\\\DESARROLLOS\\\\React\\\\MultiPencaUy\" diff --stat)",
+      "Bash(git *)"
     ]
   }
 }
