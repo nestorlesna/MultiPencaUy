@@ -4,7 +4,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
 export function Header() {
-  const { user, profile, signOut, isAdmin, isLoader } = useAuth()
+  const { user, profile, signOut, isAdmin, isLoader, isSuperAdmin } = useAuth()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -89,6 +89,20 @@ export function Header() {
                     <Link to="/descargar" className="block px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors flex items-center gap-2">
                       <QrCode size={14} /> Descargar app
                     </Link>
+                    <Link to="/pencas" className="block px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors">
+                      Mis pencas
+                    </Link>
+                    {isSuperAdmin && (
+                      <>
+                        <div className="px-4 pt-2 pb-1">
+                          <p className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1">
+                            <ShieldCheck size={11} />Plataforma
+                          </p>
+                        </div>
+                        <Link to="/admin/tenants" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Empresas (tenants)</Link>
+                        <Link to="/admin/resultados-v2" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Cargar resultados</Link>
+                      </>
+                    )}
                     {isAdmin && (
                       <>
                         <div className="px-4 pt-2 pb-1">
