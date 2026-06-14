@@ -1,7 +1,24 @@
 # Plan de Desarrollo — PencaLes 2.0 (SaaS Multi-Tenant Multi-Competencia)
 
-> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-12 — decisiones del §10 resueltas
+> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-14 — avance significativo en Fase 3; Supabase v2 funcionando
 > **Origen:** Evolución de PencaLes 2026 (repo clonado) hacia plataforma SaaS.
+
+## Avance global (2026-06-14)
+
+| Fase | Estado |
+|------|--------|
+| 0 · Preparación | 🟡 repo OK + Supabase v2 operativo; falta renombrar paquete y `.env.example` |
+| 1 · Schema + RLS | 🟡 desplegado y funcionando contra Supabase nuevo; **sin tests de RLS** |
+| 2 · Auth, contexto y selector | ✅ completo y funcionando contra backend v2 |
+| 3 · Refactor páginas de juego | 🟡 páginas de usuario completas (Fixture, Ranking, Jugar, Grupos, Ayuda); faltan Cuadro, +Puntos, Subgrupos, Admin |
+| 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar contra datos reales |
+| 5 · Administración | ⬜ |
+| 6 · Integración y pulido | ⬜ |
+| 7 · Migración de datos | 🟡 script + guía listos; ejecución post-Mundial |
+| 8 · QA, seguridad y lanzamiento | ⬜ |
+
+**Próximo paso recomendado:** Fase 3 — completar Cuadro y +Puntos (los más complejos),
+luego arrancar Fase 5 (Admin mínimo para crear Ten-Comps y cargar resultados). Detalle por fase en §5.
 
 ---
 
@@ -294,54 +311,75 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 
 > Estimaciones en semanas-persona aproximadas. El Mundial termina 19/07; la meta es tener
 > el sistema listo para migrar a fin de julio y lanzar en agosto.
+>
+> **Leyenda:** ✅ hecho · 🟡 en progreso / parcial · ⬜ pendiente
+> Última actualización del avance: **2026-06-12**.
 
-### Fase 0 — Preparación (0.5 sem)
-- [ ] Crear proyecto Supabase nuevo (región us-east o sa-east según latencia UY)
-- [ ] Crear proyecto Vercel nuevo apuntando a este repo (§7)
-- [ ] Branding **"PencaLes 2.0"**: renombrar paquete (`pencales-2026` → `pencales-2`),
-      limpiar nombres hardcodeados (plantillas email, títulos, SMTP_FROM_NAME) — dominio a definir
-- [ ] Definir convención de migraciones: carpeta `supabase/migrations/` numerada desde cero
-  (el schema viejo `01..16_*.sql` queda como referencia en `supabase/legacy/`)
-- [ ] `.env.example` actualizado; ramas `main`/`develop` como hasta ahora
+### Fase 0 — Preparación (0.5 sem) — 🟡 parcial
+- ✅ Crear proyecto Supabase nuevo (operativo, migraciones aplicadas)
+- ⬜ Crear proyecto Vercel nuevo apuntando a este repo (§7)
+- 🟡 Branding **"PencaLes 2.0"**: CLAUDE.md actualizado; falta renombrar el paquete
+      (`pencales-2026` → `pencales-2`) y limpiar nombres hardcodeados (plantillas email, SMTP_FROM_NAME)
+      — dominio a definir
+- ✅ Convención de migraciones: `supabase/migrations/` numerada desde cero; v1 en `supabase/legacy/`
+- 🟡 Repo reorganizado; falta actualizar `.env.example`. Ramas `main`/`develop` operativas
 
-### Fase 1 — Schema núcleo + RLS (1.5 sem)
-- [ ] `01_platform.sql`: profiles, tenants, tenant_roles + trigger signup
-- [ ] `02_catalog.sql`: competitions, phases, groups, stadiums, teams, matches,
-      knockout_slot_rules, combinaciones, overrides (con `sort_order`, no `order`)
-- [ ] `03_tencomp.sql`: ten_comps, ten_comp_scoring, ten_comp_members, predictions,
-      bonus_*, subgrupos, audits, email_queue
-- [ ] `04_rls.sql`: funciones helper + todas las políticas (§3.6)
-- [ ] `05_views.sql`: group_standings, best_third_ranking, leaderboard, subgrupo_ranking
-- [ ] `06_seed_dev.sql`: tenant demo + competencia de prueba corta (8 equipos) para desarrollo
-- [ ] Tests de RLS con `supabase test db` o script de smoke (matriz rol × tabla × operación)
+### Fase 1 — Schema núcleo + RLS (1.5 sem) — 🟡 desplegado y funcionando; sin tests de RLS
+- ✅ `01_schema.sql`: TODAS las tablas + triggers. `sort_order` en vez de `order`
+- ✅ `02_rls.sql`: funciones helper + todas las políticas + Storage
+- ✅ `03_functions_views.sql`: vistas + RPCs + seed de `advancement_engines`
+- ⬜ Seed de desarrollo (tenant demo + competencia corta de prueba)
+- ✅ **01/02/03 corriendo contra el Supabase nuevo** (app funcionando en producción)
+- ⬜ Tests de RLS (matriz rol × tabla × operación)
 
-### Fase 2 — Auth, contexto y selector (1 sem)
-- [ ] `useAuth` ampliado (super-admin, tenant roles)
-- [ ] `TenCompProvider` + `useTenComp()` + resolución de slug
-- [ ] Routing nuevo completo (`/p/:slug/*` + guards por rol)
-- [ ] Página **Mis Pencas**: mis Ten-Comps, explorar públicos, unirse por código (RPC)
-- [ ] Header/BottomNav dinámicos según `menu_config` + selector de penca activa
-- [ ] Flujo privado: banner "pendiente de aprobación" (puede predecir, no ve ranking propio en tabla)
+### Fase 2 — Auth, contexto y selector (1 sem) — ✅ completo, funcionando contra backend v2
+> Probado contra Supabase v2. Build OK. Todas las rutas v2 operativas.
+- ✅ `useAuth` ampliado: `isSuperAdmin`, `tenantRoles`, `isTenantAdmin()`, `isTenantLoader()`
+- ✅ `TenCompProvider` + `useTenComp()`/`useTenCompState()` + `resolveTenCompBySlug`
+- ✅ Página **Mis Pencas** (`/pencas`): mis Ten-Comps, explorar públicos, unirse por código (RPCs)
+- ✅ Flujo privado: `MembershipBanner` "pendiente de aprobación"
+- ✅ Routing `/p/:slug/*` con `TenCompLayout` + navegación dinámica según `menu_config`
+- ⬜ Selector de penca en el header global (diferido: el cambio de penca es vía `/pencas`)
 
-### Fase 3 — Refactor páginas de juego (2 sem)
-La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
-- [ ] `matchService`, `predictionService`, `groupService`, `teamService`,
-      `leaderboardService`, `bonusService`, `subgrupoService` → reciben scope
-- [ ] Fixture, Grupos (+ "Mis Grupos" virtual), Detalle grupo, Equipo
-- [ ] Cuadro (bracket) — `virtualBracket.ts` parametrizado por estructura de la competencia
-      (hoy asume M73–M104 hardcodeado → leer de knockout_slot_rules)
-- [ ] Mis Predicciones, Ranking (por Ten-Comp), Más Puntos, Subgrupos
-- [ ] Ayuda: render dinámico del scoring del Ten-Comp activo
+> Archivos: `types/tenant.ts`, `services/tenCompService.ts`, `contexts/TenCompContext.tsx`,
+> `components/tencomp/{TenCompLayout,MembershipBanner}.tsx`, `pages/PencasPage.tsx`,
+> `pages/penca/{PencaDashboardPage,PencaPlaceholderPage}.tsx`.
 
-### Fase 4 — Motor de cálculo (1.5 sem)
-- [ ] `calculate_match_points` multi-Ten-Comp (un resultado → puntos en N pencas con N scorings)
-- [ ] `calculate_bonus_points` por Ten-Comp, idempotente
-- [ ] Motores de avance: dispatcher + `wc48_best_thirds` (port) — otros motores quedan para v1.1
-- [ ] `recalculate_all(competition_id)`
-- [ ] Tests de regresión: con los datos del Mundial migrados, los puntos deben dar **idénticos**
-      a producción actual (este test es también la validación de la migración, §6.5)
+### Fase 3 — Refactor páginas de juego (2 sem) — 🟡 páginas de usuario completas; faltan Cuadro, +Puntos, Subgrupos, Admin
+> Patrón establecido: servicios v2 en `src/services/v2/` (schema con `competition_id`/`ten_comp_id`,
+> alias `order:sort_order`). Páginas v1 actualizadas para compatibilidad con schema v2
+> (alias `sort_order` en matchService, predictionService, groupService). Build OK.
+- ✅ Servicios: `v2/leaderboardService`, `v2/matchService`, `v2/predictionService`, `v2/groupStandingsService`
+- ✅ **Ranking** (`PencaRankingPage`) + `LeaderboardView` compartido con v1
+- ✅ **Fixture** (`PencaFixturePage`) — tabs de fase y filtro de grupo dinámicos, read-only
+- ✅ **Jugar / Mis Predicciones** (`PencaMisPrediccionesPage`) — próximos y jugados, `PredictionModal`
+      adaptado para v2 (prop `tenCompId`, invalidación scoped)
+- ✅ **Grupos** (`PencaGruposPage`) — `group_standings` scoped por `competition_id`, filtro por grupo,
+      link a detalle
+- ✅ **Grupo Detalle** (`PencaGrupoDetailPage`) — posiciones + partidos del grupo
+- ✅ **Ayuda** (`PencaAyudaPage`) — scoring dinámico del Ten-Comp activo + calculadora de puntos
+- ⬜ **Cuadro** (bracket) — `virtualBracket.ts` parametrizado para leer `knockout_slot_rules`;
+      hoy asume M73–M104 hardcodeado
+- ⬜ **+ Puntos** — bonus predictions scoped a `ten_comp_id`; requiere `v2/bonusService`
+- ⬜ **Subgrupos** — mini-ligas scoped a `ten_comp_id`; requiere `v2/subgrupoService`
+- ⬜ **Admin Ten-Comp** (`/p/:slug/admin`) — aprobaciones, scoring, menú (Fase 5)
+- ⬜ Equipo (`/p/:slug/equipos/:id`) — detalle de equipo scoped
 
-### Fase 5 — Administración (2 sem)
+> Archivos nuevos esta sesión: `services/v2/{predictionService,groupStandingsService}.ts`,
+> `pages/penca/{PencaMisPrediccionesPage,PencaGruposPage,PencaGrupoDetailPage,PencaAyudaPage}.tsx`.
+> Fix `sort_order` en v1 matchService, predictionService, groupService.
+> Rutas `/p/:slug/{ranking,fixture,mis-predicciones,grupos,grupos/:grupo,ayuda}` operativas.
+
+### Fase 4 — Motor de cálculo (1.5 sem) — 🟡 escrito junto al schema, sin probar
+> El SQL se escribió en `03_functions_views.sql` durante la Fase 1.
+- ✅ `calculate_match_points` multi-Ten-Comp (lee `ten_comp_scoring` de cada penca)
+- ✅ `calculate_bonus_points(competition_id)` por Ten-Comp, idempotente
+- ✅ Motores de avance: dispatcher `populate_knockout` + `engine_wc48_best_thirds` (port)
+- ✅ `recalculate_all(competition_id)` + `set_match_result(...)` (orquestación)
+- ⬜ Tests de regresión: con datos del Mundial migrados, los puntos deben dar **idénticos**
+      a producción (es también la validación de la migración, §6.5) — requiere DB con datos
+
+### Fase 5 — Administración (2 sem) — ⬜ pendiente
 - [ ] Super-admin: CRUD tenants + asignación de admins
 - [ ] Super-admin: CRUD competencias (wizard: datos → fases → grupos → equipos → partidos →
       reglas de avance → scoring/menú default) + `clone_competition`
@@ -353,7 +391,7 @@ La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] Admin Ten-Comp: aprobaciones de miembros, editar scoring, editar menú, cerrar/archivar
 - [ ] Auditoría y Usuarios adaptados a multi-tenant; Correos con scope tenant
 
-### Fase 6 — Integración y pulido (1 sem)
+### Fase 6 — Integración y pulido (1 sem) — ⬜ pendiente
 - [ ] Emails multi-tenant (plantillas con nombre del Ten-Comp; `api/` serverless adaptado)
 - [ ] ResultAutoPage (APIs externas) con mapeo por competencia
 - [ ] Capacitor: misma app, el selector resuelve el multi-tenant. **Sin stores en v1**:
@@ -362,9 +400,12 @@ La mayor parte del trabajo: pasar cada página/servicio/hook existente a scoped.
 - [ ] Revisión de performance: índices (`predictions(ten_comp_id, match_id)`,
       `ten_comp_members(user_id)`, `matches(competition_id, match_datetime)`)
 
-### Fase 7 — Migración de datos (§6) (1 sem, post 19/07)
+### Fase 7 — Migración de datos (§6) (1 sem, post 19/07) — 🟡 script y guía listos
+- ✅ Script SQL `90_migrate_from_v1.sql` (transforma `legacy.*` → v2, UUIDs preservados)
+- ✅ Guía de ejecución paso a paso `docs/MIGRACION_V1_A_V2.md` (autocontenida)
+- ⬜ Ejecución real + validación (post-Mundial, requiere ambos proyectos Supabase)
 
-### Fase 8 — QA, seguridad y lanzamiento (1 sem)
+### Fase 8 — QA, seguridad y lanzamiento (1 sem) — ⬜ pendiente
 - [ ] Pentest casero: matriz RLS completa, intentos de escalación, join_code brute-force
       (rate limit en RPC), manipulación de reloj
 - [ ] Carga de prueba: 1 competencia × 10 Ten-Comps × 500 usuarios simulados
@@ -379,16 +420,21 @@ Fases 7–8 después del 19/07.
 
 ## 6. Plan de migración de datos (PencaLes 2026 → MultiPenca)
 
+> **Implementado.** La migración es **SQL** (no Node/TS): se restaura la v1 en un schema `legacy`
+> del proyecto nuevo y un único script la transforma. Artefactos:
+> - `supabase/migrations/90_migrate_from_v1.sql` — el script de transformación
+> - `docs/MIGRACION_V1_A_V2.md` — guía de ejecución paso a paso (autocontenida, para meses después)
+
 ### 6.1 Principios
 
 1. **Se ejecuta post-Mundial** con datos congelados (proyecto viejo en solo-lectura).
-2. **Se preservan los UUIDs de usuarios** (`auth.users.id`): las FKs de predicciones y perfiles
-   migran sin remapeo. Todo lo demás (matches, teams, etc.) puede recibir IDs nuevos con
-   tabla de mapeo `mig_id_map(old_id, new_id, entity)`.
-3. **Script idempotente** (Node/TS con dos conexiones Postgres directas, service-role),
-   ejecutable por entidad, con dry-run y reporte.
+2. **Se preservan TODOS los UUIDs** (no solo los de usuarios): `auth.users`, perfiles, equipos,
+   partidos, predicciones, etc. Como el proyecto nuevo está vacío no hay colisión, y las FKs
+   migran sin tabla de mapeo. La única columna nueva es el scope (`competition_id` / `ten_comp_id`).
+3. **Script SQL idempotente** (`ON CONFLICT DO NOTHING/UPDATE`), re-ejecutable. Lee de `legacy.*`,
+   escribe en `public.*`. Anclas con UUID fijos para tenant/competencia/Ten-Comp.
 4. **Validación = recálculo**: tras migrar, `recalculate_all()` en el nuevo sistema debe
-   reproducir exactamente el leaderboard final de producción.
+   reproducir exactamente el leaderboard final de producción (diff fila a fila = 0).
 
 ### 6.2 Mapeo de entidades
 

@@ -33,6 +33,17 @@ import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { ApiPage } from './pages/ApiPage'
 import { useUpdateCheck } from './hooks/useUpdateCheck'
 import { UpdateModal } from './components/ui/UpdateModal'
+// v2 multi-tenant (Fase 2)
+import { PencasPage } from './pages/PencasPage'
+import { TenCompLayout } from './components/tencomp/TenCompLayout'
+import { PencaDashboardPage } from './pages/penca/PencaDashboardPage'
+import { PencaPlaceholderPage } from './pages/penca/PencaPlaceholderPage'
+import { PencaFixturePage } from './pages/penca/PencaFixturePage'
+import { PencaRankingPage } from './pages/penca/PencaRankingPage'
+import { PencaMisPrediccionesPage } from './pages/penca/PencaMisPrediccionesPage'
+import { PencaAyudaPage } from './pages/penca/PencaAyudaPage'
+import { PencaGruposPage } from './pages/penca/PencaGruposPage'
+import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +77,23 @@ function AppContent() {
             <Route path="mas-puntos"        element={<MasPuntosPage />} />
             <Route path="subgrupos"         element={<SubgruposPage />} />
             <Route path="subgrupos/:id"     element={<SubgrupoDetailPage />} />
+
+            {/* ── v2 multi-tenant (Fase 2) — convive con las rutas v1 de arriba ── */}
+            <Route path="pencas"            element={<PencasPage />} />
+            <Route path="p/:slug"           element={<TenCompLayout />}>
+              <Route index                  element={<PencaDashboardPage />} />
+              <Route path="fixture"         element={<PencaFixturePage />} />
+              <Route path="grupos"          element={<PencaGruposPage />} />
+              <Route path="grupos/:grupo"   element={<PencaGrupoDetailPage />} />
+              <Route path="cuadro"          element={<PencaPlaceholderPage title="Cuadro" />} />
+              <Route path="ranking"         element={<PencaRankingPage />} />
+              <Route path="mis-predicciones" element={<PencaMisPrediccionesPage />} />
+              <Route path="mas-puntos"      element={<PencaPlaceholderPage title="+ Puntos" />} />
+              <Route path="subgrupos"       element={<PencaPlaceholderPage title="Subgrupos" />} />
+              <Route path="ayuda"           element={<PencaAyudaPage />} />
+              <Route path="admin"           element={<PencaPlaceholderPage title="Administración de la penca" />} />
+            </Route>
+
             {/* Admin */}
             <Route path="admin/usuarios"    element={<UsuariosPage />} />
             <Route path="admin/resultados"  element={<ResultadosPage />} />

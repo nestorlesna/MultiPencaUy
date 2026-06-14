@@ -21,7 +21,7 @@ const PREDICTION_SELECT = `
     home_score_pk, away_score_pk,
     winner_team_id,
     home_slot_label, away_slot_label,
-    phase:phases(id, name, order, has_extra_time, has_penalties),
+    phase:phases(id, name, order:sort_order, has_extra_time, has_penalties),
     group:groups(id, name),
     stadium:stadiums(name, city),
     home_team:teams!home_team_id(id, name, abbreviation, flag_url, is_confirmed, placeholder_name),

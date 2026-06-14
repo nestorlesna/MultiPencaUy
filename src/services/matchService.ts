@@ -8,7 +8,7 @@ const MATCH_SELECT = `
   home_score_et, away_score_et,
   home_score_pk, away_score_pk,
   winner_team_id,
-  phase:phases(id, name, order, has_extra_time, has_penalties),
+  phase:phases(id, name, order:sort_order, has_extra_time, has_penalties),
   group:groups(id, name),
   stadium:stadiums(id, name, city, country, timezone),
   home_team:teams!home_team_id(id, name, abbreviation, flag_url, is_confirmed, placeholder_name),
@@ -29,9 +29,9 @@ export async function fetchMatches(filters?: {
     // Se traen todas las fases y se filtra en cliente
     const { data: phasesData } = await supabase
       .from('phases')
-      .select('id, order')
-    const phase = (phasesData as Array<{ id: string; order: number }> | null)
-      ?.find(p => p.order === filters.phaseOrder)
+      .select('id, sort_order')
+    const phase = (phasesData as Array<{ id: string; sort_order: number }> | null)
+      ?.find(p => p.sort_order === filters.phaseOrder)
     if (phase) query = query.eq('phase_id', phase.id)
   }
 

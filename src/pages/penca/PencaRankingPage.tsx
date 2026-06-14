@@ -1,11 +1,19 @@
+import { useQuery } from '@tanstack/react-query'
 import { Loader2, Trophy } from 'lucide-react'
-import { useLeaderboard } from '../hooks/useLeaderboard'
-import { useAuth } from '../hooks/useAuth'
-import { LeaderboardView } from '../components/leaderboard/LeaderboardView'
+import { useAuth } from '../../hooks/useAuth'
+import { useTenComp } from '../../contexts/TenCompContext'
+import { fetchLeaderboard } from '../../services/v2/leaderboardService'
+import { LeaderboardView } from '../../components/leaderboard/LeaderboardView'
 
-export function RankingPage() {
-  const { data: entries = [], isLoading, error } = useLeaderboard()
+export function PencaRankingPage() {
+  const { tenComp } = useTenComp()
   const { user } = useAuth()
+
+  const { data: entries = [], isLoading, error } = useQuery({
+    queryKey: ['v2', 'leaderboard', tenComp.id],
+    queryFn: () => fetchLeaderboard(tenComp.id),
+    staleTime: 1000 * 60 * 2,
+  })
 
   return (
     <div>
@@ -22,16 +30,14 @@ export function RankingPage() {
 
       {error && (
         <div className="card p-4 text-sm text-center text-text-muted">
-          Error cargando el ranking. Verificá la conexión a Supabase.
+          Error cargando el ranking.
         </div>
       )}
 
       {!isLoading && !error && entries.length === 0 && (
         <div className="card p-8 text-center">
           <Trophy size={32} className="text-text-muted mx-auto mb-3" />
-          <p className="text-text-muted text-sm">
-            Aún no hay puntos registrados. ¡El torneo empieza el 11 de junio!
-          </p>
+          <p className="text-text-muted text-sm">Aún no hay puntos registrados en esta penca.</p>
         </div>
       )}
 

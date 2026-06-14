@@ -1,19 +1,22 @@
 import { useState, useEffect } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Minus, Plus, Lock } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { TeamFlag } from '../ui/TeamFlag'
 import { upsertPrediction, deletePrediction } from '../../services/predictionService'
+import { upsertPredictionV2, deletePredictionV2 } from '../../services/v2/predictionService'
 import { useAuth } from '../../hooks/useAuth'
 import { useInvalidatePredictions } from '../../hooks/usePredictions'
 import type { MatchWithRelations } from '../../types/match'
 import type { PredictionWithMatch } from '../../services/predictionService'
+import type { PredictionV2 } from '../../services/v2/predictionService'
 
 interface Props {
   match: MatchWithRelations | null
-  existing: PredictionWithMatch | null
+  existing: PredictionWithMatch | PredictionV2 | null
   onClose: () => void
+  tenCompId?: string
 }
 
 interface FormState {
@@ -48,9 +51,18 @@ function ScoreInput({ value, onChange }: { value: number; onChange: (v: number) 
   )
 }
 
-export function PredictionModal({ match, existing, onClose }: Props) {
+export function PredictionModal({ match, existing, onClose, tenCompId }: Props) {
   const { user } = useAuth()
-  const invalidate = useInvalidatePredictions()
+  const invalidateV1 = useInvalidatePredictions()
+  const qc = useQueryClient()
+
+  function invalidate() {
+    if (tenCompId) {
+      qc.invalidateQueries({ queryKey: ['v2', 'predictions', tenCompId] })
+    } else {
+      invalidateV1()
+    }
+  }
 
   const [form, setForm] = useState<FormState>({
     homeScore: 0, awayScore: 0,
@@ -94,14 +106,26 @@ export function PredictionModal({ match, existing, onClose }: Props) {
 
       const pkWinnerId = showPk && form.pkWinnerId ? form.pkWinnerId : null
 
-      await upsertPrediction(user.id, {
-        matchId: match.id,
-        homeScore: form.homeScore,
-        awayScore: form.awayScore,
-        homeScoreEt: showEt ? form.homeScoreEt : null,
-        awayScoreEt: showEt ? form.awayScoreEt : null,
-        predictedPkWinnerId: pkWinnerId,
-      })
+      if (tenCompId) {
+        await upsertPredictionV2(user.id, {
+          tenCompId,
+          matchId: match.id,
+          homeScore: form.homeScore,
+          awayScore: form.awayScore,
+          homeScoreEt: showEt ? form.homeScoreEt : null,
+          awayScoreEt: showEt ? form.awayScoreEt : null,
+          predictedPkWinnerId: pkWinnerId,
+        })
+      } else {
+        await upsertPrediction(user.id, {
+          matchId: match.id,
+          homeScore: form.homeScore,
+          awayScore: form.awayScore,
+          homeScoreEt: showEt ? form.homeScoreEt : null,
+          awayScoreEt: showEt ? form.awayScoreEt : null,
+          predictedPkWinnerId: pkWinnerId,
+        })
+      }
     },
     onSuccess: () => {
       toast.success('Predicción guardada')
@@ -114,7 +138,11 @@ export function PredictionModal({ match, existing, onClose }: Props) {
   const { mutate: remove, isPending: removing } = useMutation({
     mutationFn: async () => {
       if (!existing) return
-      await deletePrediction(existing.id)
+      if (tenCompId) {
+        await deletePredictionV2(existing.id)
+      } else {
+        await deletePrediction(existing.id)
+      }
     },
     onSuccess: () => {
       toast.success('Predicción eliminada')
