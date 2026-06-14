@@ -37,7 +37,6 @@ import { UpdateModal } from './components/ui/UpdateModal'
 import { PencasPage } from './pages/PencasPage'
 import { TenCompLayout } from './components/tencomp/TenCompLayout'
 import { PencaDashboardPage } from './pages/penca/PencaDashboardPage'
-import { PencaPlaceholderPage } from './pages/penca/PencaPlaceholderPage'
 import { PencaFixturePage } from './pages/penca/PencaFixturePage'
 import { PencaRankingPage } from './pages/penca/PencaRankingPage'
 import { PencaMisPrediccionesPage } from './pages/penca/PencaMisPrediccionesPage'
@@ -45,6 +44,10 @@ import { PencaAyudaPage } from './pages/penca/PencaAyudaPage'
 import { PencaGruposPage } from './pages/penca/PencaGruposPage'
 import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
 import { PencaAdminPage } from './pages/penca/PencaAdminPage'
+import { PencaCuadroPage } from './pages/penca/PencaCuadroPage'
+import { PencaMasPuntosPage } from './pages/penca/PencaMasPuntosPage'
+import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
+import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
 import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
 import { AdminResultadosV2Page } from './pages/admin/AdminResultadosV2Page'
 import { TenantAdminPage } from './pages/tenant/TenantAdminPage'
@@ -89,11 +92,12 @@ function AppContent() {
               <Route path="fixture"         element={<PencaFixturePage />} />
               <Route path="grupos"          element={<PencaGruposPage />} />
               <Route path="grupos/:grupo"   element={<PencaGrupoDetailPage />} />
-              <Route path="cuadro"          element={<PencaPlaceholderPage title="Cuadro" />} />
+              <Route path="cuadro"          element={<PencaCuadroPage />} />
               <Route path="ranking"         element={<PencaRankingPage />} />
               <Route path="mis-predicciones" element={<PencaMisPrediccionesPage />} />
-              <Route path="mas-puntos"      element={<PencaPlaceholderPage title="+ Puntos" />} />
-              <Route path="subgrupos"       element={<PencaPlaceholderPage title="Subgrupos" />} />
+              <Route path="mas-puntos"      element={<PencaMasPuntosPage />} />
+              <Route path="subgrupos"       element={<PencaSubgruposPage />} />
+              <Route path="subgrupos/:id"   element={<PencaSubgrupoDetailPage />} />
               <Route path="ayuda"           element={<PencaAyudaPage />} />
               <Route path="admin"           element={<PencaAdminPage />} />
             </Route>
