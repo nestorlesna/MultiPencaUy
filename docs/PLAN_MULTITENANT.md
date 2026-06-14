@@ -1,6 +1,6 @@
 # Plan de Desarrollo — PencaLes 2.0 (SaaS Multi-Tenant Multi-Competencia)
 
-> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-14 — avance significativo en Fase 3; Supabase v2 funcionando
+> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-14 — Fase 3 completa (páginas usuario) + Fase 5 admin operativa; Supabase v2 funcionando
 > **Origen:** Evolución de PencaLes 2026 (repo clonado) hacia plataforma SaaS.
 
 ## Avance global (2026-06-14)
@@ -10,15 +10,16 @@
 | 0 · Preparación | 🟡 repo OK + Supabase v2 operativo; falta renombrar paquete y `.env.example` |
 | 1 · Schema + RLS | 🟡 desplegado y funcionando contra Supabase nuevo; **sin tests de RLS** |
 | 2 · Auth, contexto y selector | ✅ completo y funcionando contra backend v2 |
-| 3 · Refactor páginas de juego | 🟡 páginas de usuario completas (Fixture, Ranking, Jugar, Grupos, Ayuda); faltan Cuadro, +Puntos, Subgrupos, Admin |
+| 3 · Refactor páginas de juego | ✅ páginas de usuario completas (Fixture, Ranking, Jugar, Grupos, Ayuda, Cuadro, +Puntos, Subgrupos); falta "Mi Cuadro" virtual y Equipo |
 | 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar contra datos reales |
-| 5 · Administración | ⬜ |
+| 5 · Administración | 🟡 admin operativo (plataforma/tenant/Ten-Comp/resultados); falta CRUD competencias (wizard) |
 | 6 · Integración y pulido | ⬜ |
 | 7 · Migración de datos | 🟡 script + guía listos; ejecución post-Mundial |
 | 8 · QA, seguridad y lanzamiento | ⬜ |
 
-**Próximo paso recomendado:** Fase 3 — completar Cuadro y +Puntos (los más complejos),
-luego arrancar Fase 5 (Admin mínimo para crear Ten-Comps y cargar resultados). Detalle por fase en §5.
+**Próximo paso recomendado:** wizard de CRUD de competencias (Fase 5, único bloqueador para
+dar de alta competencias nuevas desde la UI) → probar el motor de cálculo con datos reales
+(Fase 4) → "Mi Cuadro" virtual parametrizado. Detalle por fase en §5.
 
 ---
 
@@ -358,11 +359,13 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
       link a detalle
 - ✅ **Grupo Detalle** (`PencaGrupoDetailPage`) — posiciones + partidos del grupo
 - ✅ **Ayuda** (`PencaAyudaPage`) — scoring dinámico del Ten-Comp activo + calculadora de puntos
-- ⬜ **Cuadro** (bracket) — `virtualBracket.ts` parametrizado para leer `knockout_slot_rules`;
-      hoy asume M73–M104 hardcodeado
-- ⬜ **+ Puntos** — bonus predictions scoped a `ten_comp_id`; requiere `v2/bonusService`
-- ⬜ **Subgrupos** — mini-ligas scoped a `ten_comp_id`; requiere `v2/subgrupoService`
-- ⬜ **Admin Ten-Comp** (`/p/:slug/admin`) — aprobaciones, scoring, menú (Fase 5)
+- ✅ **Cuadro** (bracket) — `PencaCuadroPage`, vista del cuadro del torneo scoped por
+      competición (layout WC48). ⬜ "Mi Cuadro" virtual (requiere parametrizar `virtualBracket.ts`)
+- ✅ **+ Puntos** — `v2/bonusService` + `PencaMasPuntosPage` scoped a `ten_comp_id`;
+      respeta `bonus_enabled` y membresía; lock por inicio de competencia
+- ✅ **Subgrupos** — `v2/subgrupoService` + `PencaSubgruposPage`/`PencaSubgrupoDetailPage`
+      scoped a `ten_comp_id` (crear/salir/eliminar, ranking, alta de miembros por el creador)
+- ✅ **Admin Ten-Comp** (`/p/:slug/admin`) — aprobaciones, scoring, bonus, menú, estado (Fase 5)
 - ⬜ Equipo (`/p/:slug/equipos/:id`) — detalle de equipo scoped
 
 > Archivos nuevos esta sesión: `services/v2/{predictionService,groupStandingsService}.ts`,
@@ -379,17 +382,20 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 - ⬜ Tests de regresión: con datos del Mundial migrados, los puntos deben dar **idénticos**
       a producción (es también la validación de la migración, §6.5) — requiere DB con datos
 
-### Fase 5 — Administración (2 sem) — ⬜ pendiente
-- [ ] Super-admin: CRUD tenants + asignación de admins
+### Fase 5 — Administración (2 sem) — 🟡 admin operativo; falta wizard de competencias
+> Servicio `services/v2/adminService.ts` centraliza todas las operaciones admin.
+> Build OK. Accesos desde `PencasPage` (super-admin → `/admin/tenants`; tenant-admin → `/t/:slug/admin`).
+- ✅ Super-admin: CRUD tenants + asignación de admins/cargadores (`AdminTenantsPage`)
 - [ ] Super-admin: CRUD competencias (wizard: datos → fases → grupos → equipos → partidos →
-      reglas de avance → scoring/menú default) + `clone_competition`
-- [ ] Carga de resultados con selector de competencia (evolución de ResultadosPage + ResultForm)
-- [ ] Admin tenant: CRUD Ten-Comps (crear desde competencia → copia scoring/menú/bonus → genera join_code)
-- [ ] Admin tenant: asignar cargadores
-- [ ] Límites soft: enforcement de `max_ten_comps` / `max_members_per_ten_comp` en RPCs de
-      creación y `join_ten_comp` (mensaje claro al usuario cuando se alcanza el límite)
-- [ ] Admin Ten-Comp: aprobaciones de miembros, editar scoring, editar menú, cerrar/archivar
-- [ ] Auditoría y Usuarios adaptados a multi-tenant; Correos con scope tenant
+      reglas de avance → scoring/menú default) + `clone_competition` — **pendiente**
+- ✅ Carga de resultados con selector de competencia (`AdminResultadosV2Page` + `ResultFormV2`
+      vía RPC `set_match_result` + `recalculate_all`)
+- ✅ Admin tenant: CRUD Ten-Comps (`TenantAdminPage`, RPC `create_ten_comp` → copia
+      scoring/menú/bonus → muestra join_code)
+- ✅ Admin tenant: asignar cargadores
+- 🟡 Límites soft: enforcement ya vive en los RPCs (`create_ten_comp`, `join_*`); falta UI dedicada
+- ✅ Admin Ten-Comp: aprobaciones/bloqueo de miembros, editar scoring + bonus, editar menú, estado
+- [ ] Auditoría y Usuarios adaptados a multi-tenant; Correos con scope tenant — **pendiente**
 
 ### Fase 6 — Integración y pulido (1 sem) — ⬜ pendiente
 - [ ] Emails multi-tenant (plantillas con nombre del Ten-Comp; `api/` serverless adaptado)
