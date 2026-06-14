@@ -101,8 +101,8 @@ export function PencasPage() {
       {(isSuperAdmin || adminTenants.length > 0) && (
         <div className="flex flex-wrap gap-2">
           {isSuperAdmin && (
-            <Link to="/admin/tenants" className="btn-ghost text-xs inline-flex items-center gap-1.5 text-accent border border-border">
-              <ShieldCheck size={14} /> Administrar plataforma
+            <Link to="/admin" className="btn-ghost text-xs inline-flex items-center gap-1.5 text-accent border border-border">
+              <ShieldCheck size={14} /> Administración
             </Link>
           )}
           {adminTenants.map(t => (

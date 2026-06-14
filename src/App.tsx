@@ -48,6 +48,7 @@ import { PencaCuadroPage } from './pages/penca/PencaCuadroPage'
 import { PencaMasPuntosPage } from './pages/penca/PencaMasPuntosPage'
 import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
 import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
+import { AdminHubPage } from './pages/admin/AdminHubPage'
 import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
 import { AdminResultadosV2Page } from './pages/admin/AdminResultadosV2Page'
 import { TenantAdminPage } from './pages/tenant/TenantAdminPage'
@@ -106,6 +107,7 @@ function AppContent() {
             <Route path="t/:tenantSlug/admin" element={<TenantAdminPage />} />
 
             {/* ── Super-admin plataforma (v2) ── */}
+            <Route path="admin"               element={<AdminHubPage />} />
             <Route path="admin/tenants"       element={<AdminTenantsPage />} />
             <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
 

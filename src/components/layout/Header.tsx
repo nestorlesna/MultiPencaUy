@@ -92,46 +92,10 @@ export function Header() {
                     <Link to="/pencas" className="block px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors">
                       Mis pencas
                     </Link>
-                    {isSuperAdmin && (
-                      <>
-                        <div className="px-4 pt-2 pb-1">
-                          <p className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1">
-                            <ShieldCheck size={11} />Plataforma
-                          </p>
-                        </div>
-                        <Link to="/admin/tenants" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Empresas (tenants)</Link>
-                        <Link to="/admin/resultados-v2" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Cargar resultados</Link>
-                      </>
-                    )}
-                    {isAdmin && (
-                      <>
-                        <div className="px-4 pt-2 pb-1">
-                          <p className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1">
-                            <ShieldCheck size={11} />Admin
-                          </p>
-                        </div>
-                        <Link to="/admin/usuarios" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Usuarios</Link>
-                        <Link to="/admin/resultados" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Resultados</Link>
-                        <Link to="/admin/partidos" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Partidos</Link>
-                        <Link to="/admin/equipos" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Equipos</Link>
-                        <Link to="/admin/terceros" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Terceros</Link>
-                        <Link to="/admin/posiciones-grupos" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Posiciones grupos</Link>
-                        <Link to="/admin/combinaciones" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Combinaciones 16avos</Link>
-                        <Link to="/admin/correos" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Correos</Link>
-                        <Link to="/admin/resultauto" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Resultados Auto</Link>
-                        <Link to="/admin/auditoria" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Auditoría</Link>
-                            <Link to="/admin/config" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Configuración</Link>
-                      </>
-                    )}
-                    {!isAdmin && isLoader && (
-                      <>
-                        <div className="px-4 pt-2 pb-1">
-                          <p className="text-[10px] text-text-muted uppercase tracking-wider flex items-center gap-1">
-                            <ShieldCheck size={11} />Cargador
-                          </p>
-                        </div>
-                        <Link to="/admin/resultados" className="block px-4 py-1.5 text-sm text-accent hover:bg-surface-2 transition-colors">Resultados</Link>
-                      </>
+                    {(isSuperAdmin || isAdmin || isLoader) && (
+                      <Link to="/admin" className="block px-4 py-2 text-sm text-accent hover:bg-surface-2 transition-colors flex items-center gap-2">
+                        <ShieldCheck size={14} /> Administración
+                      </Link>
                     )}
                     <button
                       onClick={signOut}
