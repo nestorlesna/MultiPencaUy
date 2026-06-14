@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { Loader2, Trophy, Globe, KeyRound, Clock, ArrowRight } from 'lucide-react'
+import { Loader2, Trophy, Globe, KeyRound, Clock, ArrowRight, ShieldCheck, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -10,15 +10,27 @@ import {
   joinPublicTenComp,
   joinPrivateTenComp,
 } from '../services/tenCompService'
+import { fetchTenantsByIds } from '../services/v2/adminService'
 import { Modal } from '../components/ui/Modal'
 import type { MyPenca, PublicPenca } from '../types/tenant'
 
 export function PencasPage() {
-  const { user } = useAuth()
+  const { user, isSuperAdmin, tenantRoles } = useAuth()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [showJoin, setShowJoin] = useState(false)
   const [code, setCode] = useState('')
+
+  // Tenants donde el usuario es admin (para mostrar accesos de administración).
+  const adminTenantIds = useMemo(
+    () => [...new Set(tenantRoles.filter(r => r.role === 'admin').map(r => r.tenant_id))],
+    [tenantRoles]
+  )
+  const { data: adminTenants = [] } = useQuery({
+    queryKey: ['admin_tenants', adminTenantIds],
+    queryFn: () => fetchTenantsByIds(adminTenantIds),
+    enabled: adminTenantIds.length > 0,
+  })
 
   const { data: myPencas = [], isLoading: loadingMine } = useQuery({
     queryKey: ['my_ten_comps', user?.id],
@@ -84,6 +96,23 @@ export function PencasPage() {
           <KeyRound size={14} /> Unirme con código
         </button>
       </div>
+
+      {/* Accesos de administración */}
+      {(isSuperAdmin || adminTenants.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {isSuperAdmin && (
+            <Link to="/admin/tenants" className="btn-ghost text-xs inline-flex items-center gap-1.5 text-accent border border-border">
+              <ShieldCheck size={14} /> Administrar plataforma
+            </Link>
+          )}
+          {adminTenants.map(t => (
+            <Link key={t.id} to={`/t/${t.slug}/admin`}
+              className="btn-ghost text-xs inline-flex items-center gap-1.5 text-primary border border-border">
+              <Building2 size={14} /> {t.name}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Mis pencas */}
       {loadingMine ? (

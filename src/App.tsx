@@ -44,6 +44,10 @@ import { PencaMisPrediccionesPage } from './pages/penca/PencaMisPrediccionesPage
 import { PencaAyudaPage } from './pages/penca/PencaAyudaPage'
 import { PencaGruposPage } from './pages/penca/PencaGruposPage'
 import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
+import { PencaAdminPage } from './pages/penca/PencaAdminPage'
+import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
+import { AdminResultadosV2Page } from './pages/admin/AdminResultadosV2Page'
+import { TenantAdminPage } from './pages/tenant/TenantAdminPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,8 +95,15 @@ function AppContent() {
               <Route path="mas-puntos"      element={<PencaPlaceholderPage title="+ Puntos" />} />
               <Route path="subgrupos"       element={<PencaPlaceholderPage title="Subgrupos" />} />
               <Route path="ayuda"           element={<PencaAyudaPage />} />
-              <Route path="admin"           element={<PencaPlaceholderPage title="Administración de la penca" />} />
+              <Route path="admin"           element={<PencaAdminPage />} />
             </Route>
+
+            {/* ── Admin de tenant (v2) ── */}
+            <Route path="t/:tenantSlug/admin" element={<TenantAdminPage />} />
+
+            {/* ── Super-admin plataforma (v2) ── */}
+            <Route path="admin/tenants"       element={<AdminTenantsPage />} />
+            <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
 
             {/* Admin */}
             <Route path="admin/usuarios"    element={<UsuariosPage />} />
