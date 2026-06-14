@@ -1,24 +1,24 @@
 # Plan de Desarrollo — PencaLes 2.0 (SaaS Multi-Tenant Multi-Competencia)
 
-> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-12 — decisiones del §10 resueltas
+> **Fecha:** 2026-06-11 · **Actualizado:** 2026-06-14 — avance significativo en Fase 3; Supabase v2 funcionando
 > **Origen:** Evolución de PencaLes 2026 (repo clonado) hacia plataforma SaaS.
 
-## Avance global (2026-06-12)
+## Avance global (2026-06-14)
 
 | Fase | Estado |
 |------|--------|
-| 0 · Preparación | 🟡 repo ordenado + branding en docs; falta crear Supabase/Vercel y renombrar paquete |
-| 1 · Schema + RLS | 🟡 escrito (01/02/03) — **sin probar contra DB** |
-| 2 · Auth, contexto y selector | 🟡 scaffolding aditivo (flag `VITE_V2_ENABLED`); build OK, sin probar contra backend |
-| 3 · Refactor páginas de juego | 🟡 primer slice: servicios v2 + Ranking + Fixture (read-only) |
-| 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar |
+| 0 · Preparación | 🟡 repo OK + Supabase v2 operativo; falta renombrar paquete y `.env.example` |
+| 1 · Schema + RLS | 🟡 desplegado y funcionando contra Supabase nuevo; **sin tests de RLS** |
+| 2 · Auth, contexto y selector | ✅ completo y funcionando contra backend v2 |
+| 3 · Refactor páginas de juego | 🟡 páginas de usuario completas (Fixture, Ranking, Jugar, Grupos, Ayuda); faltan Cuadro, +Puntos, Subgrupos, Admin |
+| 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar contra datos reales |
 | 5 · Administración | ⬜ |
 | 6 · Integración y pulido | ⬜ |
 | 7 · Migración de datos | 🟡 script + guía listos; ejecución post-Mundial |
 | 8 · QA, seguridad y lanzamiento | ⬜ |
 
-**Próximo paso recomendado:** crear el proyecto Supabase nuevo y correr `01/02/03` para validar el
-esquema antes de empezar el frontend (Fase 2). Detalle por fase en §5.
+**Próximo paso recomendado:** Fase 3 — completar Cuadro y +Puntos (los más complejos),
+luego arrancar Fase 5 (Admin mínimo para crear Ten-Comps y cargar resultados). Detalle por fase en §5.
 
 ---
 
@@ -316,64 +316,59 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 > Última actualización del avance: **2026-06-12**.
 
 ### Fase 0 — Preparación (0.5 sem) — 🟡 parcial
-- ⬜ Crear proyecto Supabase nuevo (región sa-east, São Paulo, por latencia UY)
+- ✅ Crear proyecto Supabase nuevo (operativo, migraciones aplicadas)
 - ⬜ Crear proyecto Vercel nuevo apuntando a este repo (§7)
-- 🟡 Branding **"PencaLes 2.0"**: README y CLAUDE.md actualizados; falta renombrar el paquete
-      (`pencales-2026` → `pencales-2`) y limpiar nombres hardcodeados (plantillas email, títulos,
-      SMTP_FROM_NAME) — dominio a definir
-- ✅ Convención de migraciones: `supabase/migrations/` numerada desde cero; v1 movida a
-      `supabase/legacy/` como referencia
-- 🟡 Repo reorganizado (SQL/HTML sueltos ordenados, RELEASE_GITHUB.md eliminado); falta
-      actualizar `.env.example`. Ramas `main`/`develop` operativas
+- 🟡 Branding **"PencaLes 2.0"**: CLAUDE.md actualizado; falta renombrar el paquete
+      (`pencales-2026` → `pencales-2`) y limpiar nombres hardcodeados (plantillas email, SMTP_FROM_NAME)
+      — dominio a definir
+- ✅ Convención de migraciones: `supabase/migrations/` numerada desde cero; v1 en `supabase/legacy/`
+- 🟡 Repo reorganizado; falta actualizar `.env.example`. Ramas `main`/`develop` operativas
 
-### Fase 1 — Schema núcleo + RLS (1.5 sem) — 🟡 escrita, sin probar contra DB
-> Consolidado en 3 archivos (en vez de 01–06) para minimizar la cantidad de migraciones.
-- ✅ `01_schema.sql`: TODAS las tablas (plataforma + catálogo + Ten-Comps) + triggers de fila
-      (signup, updated_at, winner, auditoría, subgrupos). `sort_order` en vez de `order`
-- ✅ `02_rls.sql`: funciones helper (§3.6) + todas las políticas + Storage (buckets avatars/logos)
-- ✅ `03_functions_views.sql`: vistas (group_standings, best_third_ranking, leaderboard,
-      subgrupo_ranking) + RPCs + seed de `advancement_engines`
+### Fase 1 — Schema núcleo + RLS (1.5 sem) — 🟡 desplegado y funcionando; sin tests de RLS
+- ✅ `01_schema.sql`: TODAS las tablas + triggers. `sort_order` en vez de `order`
+- ✅ `02_rls.sql`: funciones helper + todas las políticas + Storage
+- ✅ `03_functions_views.sql`: vistas + RPCs + seed de `advancement_engines`
 - ⬜ Seed de desarrollo (tenant demo + competencia corta de prueba)
-- ⬜ **Probar 01/02/03 contra el Supabase nuevo** (cazar errores de sintaxis — no testeado aún)
+- ✅ **01/02/03 corriendo contra el Supabase nuevo** (app funcionando en producción)
 - ⬜ Tests de RLS (matriz rol × tabla × operación)
 
-### Fase 2 — Auth, contexto y selector (1 sem) — 🟡 scaffolding aditivo, sin probar contra backend
-> Construido de forma **aditiva** y gateado por `VITE_V2_ENABLED`: convive con las rutas v1
-> sin alterar la app viva. `npm run build` pasa. Falta probar contra el Supabase v2.
+### Fase 2 — Auth, contexto y selector (1 sem) — ✅ completo, funcionando contra backend v2
+> Probado contra Supabase v2. Build OK. Todas las rutas v2 operativas.
 - ✅ `useAuth` ampliado: `isSuperAdmin`, `tenantRoles`, `isTenantAdmin()`, `isTenantLoader()`
-      (consulta a `tenant_roles` solo si el flag está activo)
 - ✅ `TenCompProvider` + `useTenComp()`/`useTenCompState()` + `resolveTenCompBySlug`
 - ✅ Página **Mis Pencas** (`/pencas`): mis Ten-Comps, explorar públicos, unirse por código (RPCs)
-- ✅ Flujo privado: `MembershipBanner` "pendiente de aprobación" (puede predecir, fuera del ranking)
-- 🟡 Routing `/p/:slug/*` con `TenCompLayout` + navegación dinámica según `menu_config`;
-      las secciones de juego son placeholders hasta la Fase 3. Guard de admin parcial
-- ⬜ Selector de penca en el header global (se difiere: el header v1 no se toca hasta el corte;
-      por ahora el cambio de penca es vía `/pencas`)
+- ✅ Flujo privado: `MembershipBanner` "pendiente de aprobación"
+- ✅ Routing `/p/:slug/*` con `TenCompLayout` + navegación dinámica según `menu_config`
+- ⬜ Selector de penca en el header global (diferido: el cambio de penca es vía `/pencas`)
 
-> Archivos nuevos: `types/tenant.ts`, `services/tenCompService.ts`, `contexts/TenCompContext.tsx`,
+> Archivos: `types/tenant.ts`, `services/tenCompService.ts`, `contexts/TenCompContext.tsx`,
 > `components/tencomp/{TenCompLayout,MembershipBanner}.tsx`, `pages/PencasPage.tsx`,
-> `pages/penca/{PencaDashboardPage,PencaPlaceholderPage}.tsx`. Flag `VITE_V2_ENABLED` en `.env.example`.
+> `pages/penca/{PencaDashboardPage,PencaPlaceholderPage}.tsx`.
 
-### Fase 3 — Refactor páginas de juego (2 sem) — 🟡 primer slice (servicios v2 + Ranking + Fixture)
-> Patrón establecido: servicios v2 nuevos en `src/services/v2/` (schema con `competition_id`/
-> `ten_comp_id`, alias `order:sort_order`), consumidos por páginas scoped vía `useTenComp()`.
-> Los servicios/páginas v1 quedan intactos (app viva). `npm run build` pasa.
-- 🟡 Servicios scoped: `v2/leaderboardService` (por ten_comp) y `v2/matchService`
-      (matches/phases/groups por competencia) ✅. Faltan `prediction`, `group`, `team`,
-      `bonus`, `subgrupo`
-- ✅ **Ranking** scoped (`PencaRankingPage`) — vista extraída a `components/leaderboard/LeaderboardView`
-      (compartida con la `RankingPage` v1, refactor sin cambio de render)
-- 🟡 **Fixture** scoped (`PencaFixturePage`) — read-only con tabs de fase y filtro de grupo
-      dinámicos; faltan predicción y modales (estadio/apuestas)
-- ⬜ Grupos (+ "Mis Grupos" virtual), Detalle grupo, Equipo
-- ⬜ Cuadro (bracket) — `virtualBracket.ts` parametrizado (hoy asume M73–M104 hardcodeado →
-      leer de `knockout_slot_rules`)
-- ⬜ Mis Predicciones, Más Puntos, Subgrupos
-- ⬜ Ayuda: render dinámico del scoring del Ten-Comp activo
+### Fase 3 — Refactor páginas de juego (2 sem) — 🟡 páginas de usuario completas; faltan Cuadro, +Puntos, Subgrupos, Admin
+> Patrón establecido: servicios v2 en `src/services/v2/` (schema con `competition_id`/`ten_comp_id`,
+> alias `order:sort_order`). Páginas v1 actualizadas para compatibilidad con schema v2
+> (alias `sort_order` en matchService, predictionService, groupService). Build OK.
+- ✅ Servicios: `v2/leaderboardService`, `v2/matchService`, `v2/predictionService`, `v2/groupStandingsService`
+- ✅ **Ranking** (`PencaRankingPage`) + `LeaderboardView` compartido con v1
+- ✅ **Fixture** (`PencaFixturePage`) — tabs de fase y filtro de grupo dinámicos, read-only
+- ✅ **Jugar / Mis Predicciones** (`PencaMisPrediccionesPage`) — próximos y jugados, `PredictionModal`
+      adaptado para v2 (prop `tenCompId`, invalidación scoped)
+- ✅ **Grupos** (`PencaGruposPage`) — `group_standings` scoped por `competition_id`, filtro por grupo,
+      link a detalle
+- ✅ **Grupo Detalle** (`PencaGrupoDetailPage`) — posiciones + partidos del grupo
+- ✅ **Ayuda** (`PencaAyudaPage`) — scoring dinámico del Ten-Comp activo + calculadora de puntos
+- ⬜ **Cuadro** (bracket) — `virtualBracket.ts` parametrizado para leer `knockout_slot_rules`;
+      hoy asume M73–M104 hardcodeado
+- ⬜ **+ Puntos** — bonus predictions scoped a `ten_comp_id`; requiere `v2/bonusService`
+- ⬜ **Subgrupos** — mini-ligas scoped a `ten_comp_id`; requiere `v2/subgrupoService`
+- ⬜ **Admin Ten-Comp** (`/p/:slug/admin`) — aprobaciones, scoring, menú (Fase 5)
+- ⬜ Equipo (`/p/:slug/equipos/:id`) — detalle de equipo scoped
 
-> Archivos nuevos: `services/v2/{leaderboardService,matchService}.ts`,
-> `components/leaderboard/LeaderboardView.tsx`, `pages/penca/{PencaRankingPage,PencaFixturePage}.tsx`.
-> Rutas `/p/:slug/{ranking,fixture}` ya no son placeholder.
+> Archivos nuevos esta sesión: `services/v2/{predictionService,groupStandingsService}.ts`,
+> `pages/penca/{PencaMisPrediccionesPage,PencaGruposPage,PencaGrupoDetailPage,PencaAyudaPage}.tsx`.
+> Fix `sort_order` en v1 matchService, predictionService, groupService.
+> Rutas `/p/:slug/{ranking,fixture,mis-predicciones,grupos,grupos/:grupo,ayuda}` operativas.
 
 ### Fase 4 — Motor de cálculo (1.5 sem) — 🟡 escrito junto al schema, sin probar
 > El SQL se escribió en `03_functions_views.sql` durante la Fase 1.

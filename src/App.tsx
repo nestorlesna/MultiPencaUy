@@ -40,6 +40,10 @@ import { PencaDashboardPage } from './pages/penca/PencaDashboardPage'
 import { PencaPlaceholderPage } from './pages/penca/PencaPlaceholderPage'
 import { PencaFixturePage } from './pages/penca/PencaFixturePage'
 import { PencaRankingPage } from './pages/penca/PencaRankingPage'
+import { PencaMisPrediccionesPage } from './pages/penca/PencaMisPrediccionesPage'
+import { PencaAyudaPage } from './pages/penca/PencaAyudaPage'
+import { PencaGruposPage } from './pages/penca/PencaGruposPage'
+import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,14 +83,14 @@ function AppContent() {
             <Route path="p/:slug"           element={<TenCompLayout />}>
               <Route index                  element={<PencaDashboardPage />} />
               <Route path="fixture"         element={<PencaFixturePage />} />
-              <Route path="grupos"          element={<PencaPlaceholderPage title="Grupos" />} />
-              <Route path="grupos/:grupo"   element={<PencaPlaceholderPage title="Grupo" />} />
+              <Route path="grupos"          element={<PencaGruposPage />} />
+              <Route path="grupos/:grupo"   element={<PencaGrupoDetailPage />} />
               <Route path="cuadro"          element={<PencaPlaceholderPage title="Cuadro" />} />
               <Route path="ranking"         element={<PencaRankingPage />} />
-              <Route path="mis-predicciones" element={<PencaPlaceholderPage title="Mis predicciones" />} />
+              <Route path="mis-predicciones" element={<PencaMisPrediccionesPage />} />
               <Route path="mas-puntos"      element={<PencaPlaceholderPage title="+ Puntos" />} />
               <Route path="subgrupos"       element={<PencaPlaceholderPage title="Subgrupos" />} />
-              <Route path="ayuda"           element={<PencaPlaceholderPage title="Ayuda" />} />
+              <Route path="ayuda"           element={<PencaAyudaPage />} />
               <Route path="admin"           element={<PencaPlaceholderPage title="Administración de la penca" />} />
             </Route>
 

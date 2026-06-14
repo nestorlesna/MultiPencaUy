@@ -55,7 +55,7 @@ export async function fetchGroups() {
   const { data, error } = await supabase
     .from('groups')
     .select('*')
-    .order('order')
+    .order('sort_order')
   if (error) throw error
   return data ?? []
 }
