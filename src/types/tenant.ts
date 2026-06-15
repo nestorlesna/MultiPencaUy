@@ -82,6 +82,7 @@ export interface MyPenca {
   tenant: TenantSummary
   competition: CompetitionSummary
   memberStatus: MemberStatus
+  createdAt: string
 }
 
 // Una penca pública para explorar.
@@ -89,6 +90,7 @@ export interface PublicPenca {
   tenComp: TenComp
   tenant: TenantSummary
   competition: CompetitionSummary
+  createdAt: string
 }
 
 // Contexto activo resuelto por slug (/p/:slug/*).

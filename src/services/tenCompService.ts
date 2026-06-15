@@ -11,7 +11,7 @@ import type {
 
 // Columnas reutilizables del Ten-Comp y sus relaciones.
 const TEN_COMP_COLS =
-  'id, tenant_id, competition_id, name, slug, visibility, status, menu_config, bonus_enabled'
+  'id, tenant_id, competition_id, name, slug, visibility, status, menu_config, bonus_enabled, created_at'
 const TENANT_COLS = 'id, name, slug, logo_url'
 const COMP_COLS = 'id, name, sport, status'
 
@@ -41,24 +41,28 @@ export async function fetchMyTenComps(userId: string): Promise<MyPenca[]> {
         tenant: tc.tenant,
         competition: tc.competition,
         memberStatus: row.status as MemberStatus,
+        createdAt: tc.created_at,
       }
     })
     .filter((p): p is MyPenca => p !== null)
-    .sort((a, b) => a.tenComp.name.localeCompare(b.tenComp.name))
+    // Más reciente primero (regla de selección de competencia activa).
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
-// Pencas públicas abiertas para explorar.
+// Pencas públicas activas para explorar / auto-seleccionar (más reciente primero).
+// Inner join a competition para excluir competencias draft/archivadas.
 export async function fetchPublicTenComps(): Promise<PublicPenca[]> {
   const { data, error } = await supabase
     .from('ten_comps')
     .select(
       `${TEN_COMP_COLS},
        tenant:tenant_id ( ${TENANT_COLS} ),
-       competition:competition_id ( ${COMP_COLS} )`
+       competition:competition_id!inner ( ${COMP_COLS} )`
     )
     .eq('visibility', 'public')
-    .neq('status', 'archived')
-    .order('name')
+    .eq('status', 'open')
+    .in('competition.status', ['active', 'finished'])
+    .order('created_at', { ascending: false })
 
   if (error) throw error
 
@@ -66,7 +70,38 @@ export async function fetchPublicTenComps(): Promise<PublicPenca[]> {
     tenComp: stripTenComp(tc),
     tenant: tc.tenant,
     competition: tc.competition,
+    createdAt: tc.created_at,
   }))
+}
+
+// Resuelve qué Ten-Comp debe quedar activo al entrar sin slug en la URL.
+// Precedencia: última usada (localStorage) → mi penca más reciente → pública más
+// reciente → null (no hay candidato). Implementación client-side, sin RPC.
+export async function resolveEntryTenCompSlug(
+  userId: string | null,
+  lastSlug: string | null
+): Promise<string | null> {
+  const [mine, publics] = await Promise.all([
+    userId ? fetchMyTenComps(userId) : Promise.resolve([] as MyPenca[]),
+    fetchPublicTenComps(),
+  ])
+
+  // 1. Última usada, si sigue accesible (mía o pública activa).
+  if (lastSlug) {
+    const stillAccessible =
+      mine.some(p => p.tenComp.slug === lastSlug) ||
+      publics.some(p => p.tenComp.slug === lastSlug)
+    if (stillAccessible) return lastSlug
+  }
+
+  // 2. Mi penca más reciente (ya vienen ordenadas desc).
+  if (mine.length > 0) return mine[0].tenComp.slug
+
+  // 3. Pública más reciente (ya vienen ordenadas desc).
+  if (publics.length > 0) return publics[0].tenComp.slug
+
+  // 4. Sin candidato.
+  return null
 }
 
 // Resuelve una penca por slug + scoring + estado de membresía del usuario.

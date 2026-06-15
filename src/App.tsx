@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 
@@ -35,6 +35,7 @@ import { useUpdateCheck } from './hooks/useUpdateCheck'
 import { UpdateModal } from './components/ui/UpdateModal'
 // v2 multi-tenant (Fase 2)
 import { PencasPage } from './pages/PencasPage'
+import { EntryRedirect } from './pages/EntryRedirect'
 import { TenCompLayout } from './components/tencomp/TenCompLayout'
 import { PencaDashboardPage } from './pages/penca/PencaDashboardPage'
 import { PencaFixturePage } from './pages/penca/PencaFixturePage'
@@ -70,7 +71,7 @@ function AppContent() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/fixture" replace />} />
+            <Route index element={<EntryRedirect />} />
             <Route path="fixture"           element={<FixturePage />} />
             <Route path="grupos"            element={<GruposPage />} />
             <Route path="grupos/:grupo"     element={<GrupoDetailPage />} />

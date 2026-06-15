@@ -131,7 +131,7 @@ export function CombinacionesPage() {
   const { id: competitionId = '' } = useParams()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingKey, setEditingKey] = useState<string | null>(null)
 
   const { data: activeKey, isLoading: loadingKey } = useQuery({
     queryKey: ['active_comb_key', competitionId],
@@ -141,24 +141,25 @@ export function CombinacionesPage() {
   })
 
   const { data: activeComb } = useQuery({
-    queryKey: ['combinacion_active', activeKey],
-    queryFn: () => (activeKey ? fetchCombinacionByKey(activeKey) : null),
-    enabled: !!activeKey,
+    queryKey: ['combinacion_active', competitionId, activeKey],
+    queryFn: () => (activeKey ? fetchCombinacionByKey(competitionId, activeKey) : null),
+    enabled: !!competitionId && !!activeKey,
     staleTime: 1000 * 60,
   })
 
   const { data: rows = [], isLoading: loadingRows } = useQuery({
-    queryKey: ['combinaciones', search],
-    queryFn: () => fetchCombinaciones(search),
+    queryKey: ['combinaciones', competitionId, search],
+    queryFn: () => fetchCombinaciones(competitionId, search),
+    enabled: !!competitionId,
     staleTime: 1000 * 30,
   })
 
   const mutateSave = useMutation({
-    mutationFn: ({ id, updates }: { id: number; updates: Partial<Combinacion> }) =>
-      updateCombinacion(id, updates),
+    mutationFn: ({ combinacion, updates }: { combinacion: string; updates: Partial<Combinacion> }) =>
+      updateCombinacion(competitionId, combinacion, updates),
     onSuccess: () => {
       toast.success('Combinación actualizada')
-      setEditingId(null)
+      setEditingKey(null)
       qc.invalidateQueries({ queryKey: ['combinaciones'] })
       qc.invalidateQueries({ queryKey: ['combinacion_active'] })
     },
@@ -283,19 +284,19 @@ export function CombinacionesPage() {
                 </thead>
                 <tbody>
                   {rows.map(row =>
-                    editingId === row.id ? (
+                    editingKey === row.combinacion ? (
                       <EditRow
-                        key={row.id}
+                        key={row.combinacion}
                         row={row}
-                        onSave={updates => mutateSave.mutate({ id: row.id, updates })}
-                        onCancel={() => setEditingId(null)}
+                        onSave={updates => mutateSave.mutate({ combinacion: row.combinacion, updates })}
+                        onCancel={() => setEditingKey(null)}
                       />
                     ) : (
                       <DataRow
-                        key={row.id}
+                        key={row.combinacion}
                         row={row}
                         isActive={row.combinacion === activeKey}
-                        onEdit={() => setEditingId(row.id)}
+                        onEdit={() => setEditingKey(row.combinacion)}
                       />
                     )
                   )}

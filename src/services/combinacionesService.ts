@@ -1,7 +1,9 @@
 import { supabase } from '../lib/supabase'
 
+// En v2 la tabla `combinaciones` está scopeada por competencia.
+// Identidad = PK compuesta (competition_id, combinacion). No hay columna `id`.
 export interface Combinacion {
-  id: number
+  competition_id: string
   combinacion: string
   rival_1a: string
   rival_1b: string
@@ -11,7 +13,7 @@ export interface Combinacion {
   rival_1i: string
   rival_1k: string
   rival_1l: string
-  [key: string]: string | number
+  [key: string]: string
 }
 
 export const RIVAL_COLS = [
@@ -25,11 +27,15 @@ export const RIVAL_COLS = [
   { col: 'rival_1l', label: '1L' },
 ] as const
 
-export async function fetchCombinaciones(search?: string): Promise<Combinacion[]> {
+export async function fetchCombinaciones(
+  competitionId: string,
+  search?: string
+): Promise<Combinacion[]> {
   let query = supabase
     .from('combinaciones')
     .select('*')
-    .order('id')
+    .eq('competition_id', competitionId)
+    .order('combinacion')
 
   if (search && search.length > 0) {
     query = query.ilike('combinacion', `%${search}%`)
@@ -40,29 +46,29 @@ export async function fetchCombinaciones(search?: string): Promise<Combinacion[]
   return (data ?? []) as Combinacion[]
 }
 
-export async function fetchCombinacionByKey(key: string): Promise<Combinacion | null> {
+export async function fetchCombinacionByKey(
+  competitionId: string,
+  key: string
+): Promise<Combinacion | null> {
   const { data, error } = await supabase
     .from('combinaciones')
     .select('*')
+    .eq('competition_id', competitionId)
     .eq('combinacion', key)
-    .single()
-  if (error && error.code !== 'PGRST116') throw error
+    .maybeSingle()
+  if (error) throw error
   return data as Combinacion | null
 }
 
 export async function updateCombinacion(
-  id: number,
-  updates: Partial<Omit<Combinacion, 'id' | 'combinacion'>>
+  competitionId: string,
+  combinacion: string,
+  updates: Partial<Omit<Combinacion, 'competition_id' | 'combinacion'>>
 ): Promise<void> {
   const { error } = await supabase
     .from('combinaciones')
     .update(updates)
-    .eq('id', id)
+    .eq('competition_id', competitionId)
+    .eq('combinacion', combinacion)
   if (error) throw error
-}
-
-export async function recalcularKnockout(): Promise<number> {
-  const { data, error } = await supabase.rpc('populate_knockout_matches')
-  if (error) throw error
-  return data as number
 }
