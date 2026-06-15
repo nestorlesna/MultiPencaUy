@@ -38,21 +38,21 @@ export function RequireActive({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-/** Bloquea acceso si no es admin */
+/** Bloquea acceso si no es admin (el super-admin siempre pasa) */
 export function RequireAdmin({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading } = useAuth()
+  const { user, isAdmin, isSuperAdmin, loading } = useAuth()
   if (loading) return null
   if (!user) return <Navigate to="/auth" replace />
-  if (!isAdmin) return <Navigate to="/" replace />
+  if (!isAdmin && !isSuperAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
 /** Permite acceso a admin O cargador (solo pantalla de resultados) */
 export function RequireLoader({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, isLoader, loading } = useAuth()
+  const { user, isAdmin, isLoader, isSuperAdmin, loading } = useAuth()
   if (loading) return null
   if (!user) return <Navigate to="/auth" replace />
-  if (!isAdmin && !isLoader) return <Navigate to="/" replace />
+  if (!isAdmin && !isLoader && !isSuperAdmin) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
