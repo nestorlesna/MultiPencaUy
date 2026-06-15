@@ -1,33 +1,12 @@
-import { Outlet, NavLink, Link, useParams } from 'react-router-dom'
-import { Loader2, ArrowLeft, ShieldCheck } from 'lucide-react'
-import { TenCompProvider, useTenCompState } from '../../contexts/TenCompContext'
+import { Outlet, Link } from 'react-router-dom'
+import { Loader2, ArrowLeft } from 'lucide-react'
+import { useTenCompState } from '../../contexts/TenCompContext'
 import { MembershipBanner } from './MembershipBanner'
-import type { MenuConfig } from '../../types/tenant'
 
-// Ítems del menú scoped a la penca. `key` matchea con menu_config.
-const MENU: { key: keyof MenuConfig; path: string; label: string }[] = [
-  { key: 'fixture',          path: 'fixture',          label: 'Fixture' },
-  { key: 'grupos',           path: 'grupos',           label: 'Grupos' },
-  { key: 'cuadro',           path: 'cuadro',           label: 'Cuadro' },
-  { key: 'ranking',          path: 'ranking',          label: 'Ranking' },
-  { key: 'mis_predicciones', path: 'mis-predicciones', label: 'Jugar' },
-  { key: 'mas_puntos',       path: 'mas-puntos',       label: '+ Puntos' },
-  { key: 'subgrupos',        path: 'subgrupos',        label: 'Subgrupos' },
-  { key: 'ayuda',            path: 'ayuda',            label: 'Ayuda' },
-]
-
-// Layout del subárbol /p/:slug/*: provee el contexto y dibuja la navegación
-// dinámica según menu_config del Ten-Comp.
+// Layout del subárbol /p/:slug/*. El contexto del Ten-Comp activo lo provee
+// ActiveTenCompProvider (a nivel Layout); aquí solo se manejan los estados de
+// carga / no encontrada y se muestra el banner de membresía.
 export function TenCompLayout() {
-  const { slug = '' } = useParams()
-  return (
-    <TenCompProvider slug={slug}>
-      <TenCompShell />
-    </TenCompProvider>
-  )
-}
-
-function TenCompShell() {
   const { data, isLoading, notFound } = useTenCompState()
 
   if (isLoading) {
@@ -49,55 +28,9 @@ function TenCompShell() {
     )
   }
 
-  const { tenComp, competition, memberStatus, isTenCompAdmin } = data
-  const menu = tenComp.menu_config ?? {}
-  const visibleItems = MENU.filter(item => menu[item.key] !== false)
-  const base = `/p/${tenComp.slug}`
-
   return (
     <div>
-      {/* Cabecera de la penca */}
-      <div className="mb-4">
-        <Link to="/pencas" className="text-xs text-text-muted hover:text-text-secondary inline-flex items-center gap-1 mb-2">
-          <ArrowLeft size={12} /> Mis pencas
-        </Link>
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h1 className="text-lg font-bold text-text-primary truncate">{tenComp.name}</h1>
-            <p className="text-xs text-text-muted truncate">{competition.name}</p>
-          </div>
-          {isTenCompAdmin && (
-            <NavLink
-              to={`${base}/admin`}
-              className="btn-ghost text-xs px-2.5 py-1.5 inline-flex items-center gap-1.5 text-accent"
-            >
-              <ShieldCheck size={14} /> Admin
-            </NavLink>
-          )}
-        </div>
-      </div>
-
-      {/* Navegación scoped */}
-      <nav className="flex gap-1 overflow-x-auto pb-2 mb-4 border-b border-border">
-        {visibleItems.map(item => (
-          <NavLink
-            key={item.key}
-            to={`${base}/${item.path}`}
-            className={({ isActive }) =>
-              `px-3 py-1.5 text-sm rounded-lg whitespace-nowrap transition-colors ${
-                isActive
-                  ? 'text-text-primary bg-surface-2'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
-              }`
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <MembershipBanner memberStatus={memberStatus} visibility={tenComp.visibility} />
-
+      <MembershipBanner memberStatus={data.memberStatus} visibility={data.tenComp.visibility} />
       <Outlet />
     </div>
   )

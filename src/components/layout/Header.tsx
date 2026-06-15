@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Trophy, Menu, X, ShieldCheck, HelpCircle, QrCode, Smartphone, Wifi } from 'lucide-react'
+import { Menu, X, ShieldCheck, QrCode, Smartphone } from 'lucide-react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useTenCompState } from '../../contexts/TenCompContext'
+import { visibleMenuItems } from '../tencomp/menu'
+import { CompetitionSwitcher } from './CompetitionSwitcher'
 
 export function Header() {
   const { user, profile, signOut, isAdmin, isLoader, isSuperAdmin } = useAuth()
+  const { data } = useTenCompState()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -31,32 +35,30 @@ export function Header() {
     ? (profile.display_name || profile.username)[0].toUpperCase()
     : 'U'
 
+  // Menú dinámico de la competencia activa.
+  const base = data ? `/p/${data.tenComp.slug}` : null
+  const menuItems = data ? visibleMenuItems(data.tenComp.menu_config, !!user) : []
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/fixture" className="flex items-center gap-2 font-bold text-text-primary">
-            <Trophy className="text-accent" size={20} />
-            <span className="text-sm font-semibold hidden xs:block">PencaLes 2026</span>
-            <span className="text-sm font-semibold xs:hidden">PencaLes 2026</span>
-          </Link>
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+          {/* Switcher de competencia */}
+          <CompetitionSwitcher />
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            <DeskNavLink to="/fixture">Fixture</DeskNavLink>
-            <DeskNavLink to="/grupos">Grupos</DeskNavLink>
-            <DeskNavLink to="/ranking">Ranking</DeskNavLink>
-            {user && <DeskNavLink to="/subgrupos">Subgrupos</DeskNavLink>}
-            <DeskNavLink to="/cuadro">Cuadro</DeskNavLink>
-            {user && <DeskNavLink to="/mis-predicciones">JUGAR</DeskNavLink>}
-            {user && <DeskNavLink to="/mas-puntos">+ Puntos</DeskNavLink>}
-            <DeskNavLink to="/api-info">
-              <Wifi size={14} className="inline mr-1" />API
-            </DeskNavLink>
-            <DeskNavLink to="/ayuda">
-              <HelpCircle size={14} className="inline mr-1" />Ayuda
-            </DeskNavLink>
+          {/* Desktop nav — dinámica según la penca activa */}
+          <nav className="hidden md:flex items-center gap-1 flex-1 justify-center overflow-x-auto">
+            {base &&
+              menuItems.map(item => (
+                <DeskNavLink key={item.key} to={`${base}/${item.path}`}>
+                  {item.label}
+                </DeskNavLink>
+              ))}
+            {base && data?.isTenCompAdmin && (
+              <DeskNavLink to={`${base}/admin`}>
+                <ShieldCheck size={14} className="inline mr-1 text-accent" />Admin
+              </DeskNavLink>
+            )}
           </nav>
 
           {/* Derecha: usuario o botón ingresar */}
@@ -132,21 +134,22 @@ export function Header() {
         </div>
       </header>
 
-      {/* Mobile menu panel */}
+      {/* Mobile menu panel — dinámico */}
       {mobileMenuOpen && (
         <div className="md:hidden fixed inset-x-0 top-14 z-30 bg-surface border-b border-border shadow-xl">
           <nav className="flex flex-col py-2">
-            <MobileNavLink to="/fixture">Fixture</MobileNavLink>
-            <MobileNavLink to="/grupos">Grupos</MobileNavLink>
-            <MobileNavLink to="/ranking">Ranking</MobileNavLink>
-            {user && <MobileNavLink to="/subgrupos">Subgrupos</MobileNavLink>}
-            <MobileNavLink to="/cuadro">Cuadro</MobileNavLink>
-            {user && <MobileNavLink to="/mis-predicciones">JUGAR</MobileNavLink>}
-            {user && <MobileNavLink to="/mas-puntos">+ Puntos</MobileNavLink>}
+            {base &&
+              menuItems.map(item => (
+                <MobileNavLink key={item.key} to={`${base}/${item.path}`}>
+                  {item.label}
+                </MobileNavLink>
+              ))}
+            {base && data?.isTenCompAdmin && (
+              <MobileNavLink to={`${base}/admin`}>Admin de la penca</MobileNavLink>
+            )}
+            <MobileNavLink to="/pencas">Mis pencas</MobileNavLink>
             {user && <MobileNavLink to="/perfil">Mi perfil</MobileNavLink>}
-{user && <MobileNavLink to="/descargar">Descargar app</MobileNavLink>}
-            <MobileNavLink to="/api-info">API · Tiempo real</MobileNavLink>
-            <MobileNavLink to="/ayuda">Ayuda · Puntaje</MobileNavLink>
+            {user && <MobileNavLink to="/descargar">Descargar app</MobileNavLink>}
             {!user && <MobileNavLink to="/auth">Ingresar</MobileNavLink>}
           </nav>
         </div>
@@ -160,7 +163,7 @@ function DeskNavLink({ to, children }: { to: string; children: React.ReactNode }
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `px-3 py-1.5 text-sm rounded-lg transition-colors ${
+        `px-3 py-1.5 text-sm rounded-lg transition-colors whitespace-nowrap ${
           isActive ? 'text-text-primary bg-surface-2' : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
         }`
       }
@@ -174,6 +177,7 @@ function MobileNavLink({ to, children }: { to: string; children: React.ReactNode
   return (
     <NavLink
       to={to}
+      end
       className={({ isActive }) =>
         `px-5 py-3 text-sm transition-colors ${
           isActive ? 'text-primary bg-primary/5 font-medium' : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'

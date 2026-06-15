@@ -34,7 +34,7 @@ export function PencasPage() {
 
   const { data: myPencas = [], isLoading: loadingMine } = useQuery({
     queryKey: ['my_ten_comps', user?.id],
-    queryFn: () => (user ? fetchMyTenComps(user.id) : Promise.resolve([])),
+    queryFn: () => (user ? fetchMyTenComps(user.id) : Promise.resolve([] as MyPenca[])),
     enabled: !!user,
   })
 
@@ -45,6 +45,17 @@ export function PencasPage() {
 
   const myIds = useMemo(() => new Set(myPencas.map(p => p.tenComp.id)), [myPencas])
   const explorable = publicPencas.filter(p => !myIds.has(p.tenComp.id))
+
+  // Mis pencas: públicas primero, privadas agrupadas por tenant.
+  const myPublic = myPencas.filter(p => p.tenComp.visibility === 'public')
+  const privateByTenant = useMemo(() => {
+    const map = new Map<string, { tenantName: string; pencas: MyPenca[] }>()
+    for (const p of myPencas.filter(p => p.tenComp.visibility === 'private')) {
+      if (!map.has(p.tenant.id)) map.set(p.tenant.id, { tenantName: p.tenant.name, pencas: [] })
+      map.get(p.tenant.id)!.pencas.push(p)
+    }
+    return Array.from(map.values())
+  }, [myPencas])
 
   const joinPublicMut = useMutation({
     mutationFn: (tenCompId: string) => joinPublicTenComp(tenCompId),
@@ -72,14 +83,15 @@ export function PencasPage() {
     onError: (e: any) => toast.error(e.message || 'Código inválido'),
   })
 
-  if (!user) {
-    return (
-      <div className="card p-8 text-center">
-        <Trophy size={32} className="text-text-muted mx-auto mb-3" />
-        <p className="text-text-muted text-sm mb-4">Iniciá sesión para ver y unirte a tus pencas.</p>
-        <Link to="/auth" className="btn-primary text-sm">Ingresar</Link>
-      </div>
-    )
+  // Acción de unirse pública: logueado se une al instante; anónimo va a ingresar.
+  const handleJoinPublic = (tenCompId: string) => {
+    if (!user) { navigate('/auth'); return }
+    joinPublicMut.mutate(tenCompId)
+  }
+  const handleCodeClick = () => {
+    if (!user) { navigate('/auth'); return }
+    setShowJoin(true)
+    setCode('')
   }
 
   return (
@@ -87,10 +99,10 @@ export function PencasPage() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Trophy size={20} className="text-primary" />
-          <h1 className="text-xl font-bold text-text-primary">Mis pencas</h1>
+          <h1 className="text-xl font-bold text-text-primary">{user ? 'Mis pencas' : 'Pencas'}</h1>
         </div>
         <button
-          onClick={() => { setShowJoin(true); setCode('') }}
+          onClick={handleCodeClick}
           className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1"
         >
           <KeyRound size={14} /> Unirme con código
@@ -114,18 +126,43 @@ export function PencasPage() {
         </div>
       )}
 
-      {/* Mis pencas */}
-      {loadingMine ? (
-        <Spinner />
-      ) : myPencas.length === 0 ? (
-        <div className="card p-8 text-center">
-          <p className="text-text-muted text-sm">
-            Todavía no participás en ninguna penca. Explorá las públicas o unite con un código.
+      {/* Mis pencas (solo logueado) */}
+      {user && (
+        loadingMine ? (
+          <Spinner />
+        ) : myPencas.length === 0 ? (
+          <div className="card p-8 text-center">
+            <p className="text-text-muted text-sm">
+              Todavía no participás en ninguna penca. Explorá las públicas o unite con un código.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {myPublic.length > 0 && (
+              <PencaGroup icon={<Globe size={14} className="text-text-secondary" />} title="Públicas">
+                {myPublic.map(p => <MyPencaCard key={p.tenComp.id} penca={p} />)}
+              </PencaGroup>
+            )}
+            {privateByTenant.map(group => (
+              <PencaGroup
+                key={group.tenantName}
+                icon={<Building2 size={14} className="text-text-secondary" />}
+                title={group.tenantName}
+              >
+                {group.pencas.map(p => <MyPencaCard key={p.tenComp.id} penca={p} />)}
+              </PencaGroup>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* CTA de ingreso para anónimos */}
+      {!user && (
+        <div className="card p-4 text-center">
+          <p className="text-text-muted text-sm mb-3">
+            Ingresá para sumarte a una penca pública o usar un código de penca privada.
           </p>
-        </div>
-      ) : (
-        <div className="grid sm:grid-cols-2 gap-3">
-          {myPencas.map(p => <MyPencaCard key={p.tenComp.id} penca={p} />)}
+          <Link to="/auth" className="btn-primary text-sm">Ingresar</Link>
         </div>
       )}
 
@@ -138,7 +175,9 @@ export function PencasPage() {
         {loadingPublic ? (
           <Spinner />
         ) : explorable.length === 0 ? (
-          <p className="text-xs text-text-muted">No hay pencas públicas nuevas para explorar.</p>
+          <p className="text-xs text-text-muted">
+            {user ? 'No hay pencas públicas nuevas para explorar.' : 'No hay pencas públicas activas por ahora.'}
+          </p>
         ) : (
           <div className="grid sm:grid-cols-2 gap-3">
             {explorable.map(p => (
@@ -146,7 +185,9 @@ export function PencasPage() {
                 key={p.tenComp.id}
                 penca={p}
                 joining={joinPublicMut.isPending}
-                onJoin={() => joinPublicMut.mutate(p.tenComp.id)}
+                cta={user ? 'Unirme' : 'Ingresar'}
+                onJoin={() => handleJoinPublic(p.tenComp.id)}
+                onOpen={() => navigate(`/p/${p.tenComp.slug}`)}
               />
             ))}
           </div>
@@ -188,6 +229,18 @@ export function PencasPage() {
   )
 }
 
+function PencaGroup({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 mb-2">
+        {icon}
+        <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">{title}</h3>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">{children}</div>
+    </div>
+  )
+}
+
 function MyPencaCard({ penca }: { penca: MyPenca }) {
   const { tenComp, competition, memberStatus } = penca
   return (
@@ -208,16 +261,28 @@ function MyPencaCard({ penca }: { penca: MyPenca }) {
   )
 }
 
-function PublicPencaCard({ penca, onJoin, joining }: { penca: PublicPenca; onJoin: () => void; joining: boolean }) {
+function PublicPencaCard({
+  penca,
+  onJoin,
+  onOpen,
+  joining,
+  cta,
+}: {
+  penca: PublicPenca
+  onJoin: () => void
+  onOpen: () => void
+  joining: boolean
+  cta: string
+}) {
   const { tenComp, competition, tenant } = penca
   return (
     <div className="card p-4 flex items-start justify-between gap-2">
-      <div className="min-w-0">
+      <button onClick={onOpen} className="min-w-0 text-left">
         <p className="text-sm font-medium text-text-primary truncate">{tenComp.name}</p>
         <p className="text-xs text-text-muted truncate">{competition.name} · {tenant.name}</p>
-      </div>
+      </button>
       <button onClick={onJoin} disabled={joining} className="btn-primary text-xs px-3 py-1.5 flex-shrink-0">
-        {joining ? <Loader2 size={14} className="animate-spin" /> : 'Unirme'}
+        {joining ? <Loader2 size={14} className="animate-spin" /> : cta}
       </button>
     </div>
   )
