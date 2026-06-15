@@ -3,6 +3,7 @@ import type {
   Tenant,
   TenComp,
   Competition,
+  CompetitionStatus,
   TenCompScoring,
   MenuConfig,
   TenantRoleName,
@@ -159,6 +160,65 @@ export async function fetchCompetitions(): Promise<Competition[]> {
     .order('created_at', { ascending: false })
   if (error) throw error
   return (data ?? []) as Competition[]
+}
+
+export async function fetchCompetition(id: string): Promise<Competition | null> {
+  const { data, error } = await supabase
+    .from('competitions')
+    .select(COMP_COLS)
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return (data as Competition) ?? null
+}
+
+export interface CompetitionInput {
+  name: string
+  sport: string
+  season?: string | null
+  status?: CompetitionStatus
+  start_date?: string | null
+  end_date?: string | null
+  advancement_engine?: string | null
+}
+
+export async function createCompetition(input: CompetitionInput): Promise<Competition> {
+  const { data, error } = await supabase
+    .from('competitions')
+    .insert({
+      name: input.name,
+      sport: input.sport,
+      season: input.season ?? null,
+      status: input.status ?? 'draft',
+      start_date: input.start_date ?? null,
+      end_date: input.end_date ?? null,
+      advancement_engine: input.advancement_engine ?? null,
+    })
+    .select(COMP_COLS)
+    .single()
+  if (error) throw error
+  return data as Competition
+}
+
+export async function updateCompetition(id: string, patch: Partial<CompetitionInput>): Promise<void> {
+  const { error } = await supabase.from('competitions').update(patch).eq('id', id)
+  if (error) throw error
+}
+
+// Catálogo de motores de avance (para el selector al crear una competencia).
+export interface AdvancementEngine {
+  id: string
+  name: string
+  description: string | null
+}
+
+export async function fetchAdvancementEngines(): Promise<AdvancementEngine[]> {
+  const { data, error } = await supabase
+    .from('advancement_engines')
+    .select('id, name, description')
+    .order('name')
+  if (error) throw error
+  return (data ?? []) as AdvancementEngine[]
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -50,6 +50,8 @@ import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
 import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
 import { AdminHubPage } from './pages/admin/AdminHubPage'
 import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
+import { CompetenciasPage } from './pages/admin/CompetenciasPage'
+import { CompetenciaDetailPage } from './pages/admin/CompetenciaDetailPage'
 import { AdminResultadosV2Page } from './pages/admin/AdminResultadosV2Page'
 import { TenantAdminPage } from './pages/tenant/TenantAdminPage'
 
@@ -109,6 +111,8 @@ function AppContent() {
             {/* ── Super-admin plataforma (v2) ── */}
             <Route path="admin"               element={<AdminHubPage />} />
             <Route path="admin/tenants"       element={<AdminTenantsPage />} />
+            <Route path="admin/competencias"     element={<CompetenciasPage />} />
+            <Route path="admin/competencias/:id" element={<CompetenciaDetailPage />} />
             <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
 
             {/* Admin */}
