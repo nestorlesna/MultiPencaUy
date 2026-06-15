@@ -1,23 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Info, AlertTriangle, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { Loader2, Info, AlertTriangle, ChevronUp, ChevronDown, RotateCcw, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
-import { supabase } from '../../lib/supabase'
+import { fetchBestThirds } from '../../services/v2/groupStandingsService'
 import {
   saveBestThirdRankOverrides,
   deleteBestThirdRankOverrides,
 } from '../../services/groupService'
 import type { BestThirdRanking } from '../../types/database'
-
-async function fetchBestThirds(): Promise<BestThirdRanking[]> {
-  const { data, error } = await supabase
-    .from('best_third_ranking')
-    .select('*')
-    .order('rank')
-  if (error) throw error
-  return (data ?? []) as BestThirdRanking[]
-}
 
 function QualifyBadge({ rank }: { rank: number }) {
   if (rank <= 8) {
@@ -35,10 +27,12 @@ function QualifyBadge({ rank }: { rank: number }) {
 }
 
 export function TercerosPage() {
+  const { id: competitionId = '' } = useParams()
   const qc = useQueryClient()
   const { data: thirds = [], isLoading } = useQuery({
-    queryKey: ['best_third_ranking'],
-    queryFn: fetchBestThirds,
+    queryKey: ['best_third_ranking', competitionId],
+    queryFn: () => fetchBestThirds(competitionId),
+    enabled: !!competitionId,
     staleTime: 1000 * 30,
   })
 
@@ -103,6 +97,9 @@ export function TercerosPage() {
   return (
     <RequireAdmin>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+          <ArrowLeft size={14} /> Competencia
+        </Link>
 
         {/* Header */}
         <div className="flex items-start justify-between gap-3">

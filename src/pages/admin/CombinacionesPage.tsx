@@ -1,23 +1,25 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Search, Edit2, Check, X, RefreshCw, Info } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { Loader2, Search, Edit2, Check, X, RefreshCw, Info, ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { supabase } from '../../lib/supabase'
+import { populateKnockoutV2 } from '../../services/v2/adminService'
 import {
   fetchCombinaciones,
   fetchCombinacionByKey,
   updateCombinacion,
-  recalcularKnockout,
   RIVAL_COLS,
   type Combinacion,
 } from '../../services/combinacionesService'
 
-// ── Calcular clave activa desde los mejores terceros ─────────────────────────
-async function fetchActiveKey(): Promise<string | null> {
+// ── Calcular clave activa desde los mejores terceros de la competencia ───────
+async function fetchActiveKey(competitionId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('best_third_ranking')
     .select('group_name')
+    .eq('competition_id', competitionId)
     .order('rank')
     .limit(8)
   if (error) throw error
@@ -126,13 +128,15 @@ function DataRow({
 
 // ── Página ────────────────────────────────────────────────────────────────────
 export function CombinacionesPage() {
+  const { id: competitionId = '' } = useParams()
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [editingId, setEditingId] = useState<number | null>(null)
 
   const { data: activeKey, isLoading: loadingKey } = useQuery({
-    queryKey: ['active_comb_key'],
-    queryFn: fetchActiveKey,
+    queryKey: ['active_comb_key', competitionId],
+    queryFn: () => fetchActiveKey(competitionId),
+    enabled: !!competitionId,
     staleTime: 1000 * 60,
   })
 
@@ -162,7 +166,7 @@ export function CombinacionesPage() {
   })
 
   const mutateRecalc = useMutation({
-    mutationFn: recalcularKnockout,
+    mutationFn: () => populateKnockoutV2(competitionId),
     onSuccess: (n) => {
       toast.success(`16avos recalculados (${n} slots actualizados)`)
       qc.invalidateQueries({ queryKey: ['bracket'] })
@@ -173,6 +177,9 @@ export function CombinacionesPage() {
   return (
     <RequireAdmin>
       <div className="px-4 py-6 space-y-6 max-w-5xl mx-auto">
+        <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+          <ArrowLeft size={14} /> Competencia
+        </Link>
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div>

@@ -113,20 +113,21 @@ function AppContent() {
             <Route path="admin/tenants"       element={<AdminTenantsPage />} />
             <Route path="admin/competencias"     element={<CompetenciasPage />} />
             <Route path="admin/competencias/:id" element={<CompetenciaDetailPage />} />
+            {/* Catálogo deportivo scopeado a la competencia */}
+            <Route path="admin/competencias/:id/equipos"           element={<EquiposAdminPage />} />
+            <Route path="admin/competencias/:id/partidos"          element={<PartidosAdminPage />} />
+            <Route path="admin/competencias/:id/terceros"          element={<TercerosPage />} />
+            <Route path="admin/competencias/:id/posiciones-grupos" element={<PosicionesGruposPage />} />
+            <Route path="admin/competencias/:id/combinaciones"     element={<CombinacionesPage />} />
+            <Route path="admin/competencias/:id/resultauto"        element={<ResultAutoPage />} />
             <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
 
             {/* Admin */}
             <Route path="admin/usuarios"    element={<UsuariosPage />} />
             <Route path="admin/resultados"  element={<ResultadosPage />} />
             <Route path="admin/config"      element={<ConfigPage />} />
-            <Route path="admin/equipos"     element={<EquiposAdminPage />} />
             <Route path="admin/auditoria"   element={<AuditoriaPage />} />
-            <Route path="admin/partidos"    element={<PartidosAdminPage />} />
-            <Route path="admin/terceros"    element={<TercerosPage />} />
-            <Route path="admin/posiciones-grupos" element={<PosicionesGruposPage />} />
-            <Route path="admin/combinaciones"     element={<CombinacionesPage />} />
             <Route path="admin/correos"           element={<CorreosPage />} />
-            <Route path="admin/resultauto"        element={<ResultAutoPage />} />
             <Route path="*"                 element={<NotFoundPage />} />
           </Route>
         </Routes>

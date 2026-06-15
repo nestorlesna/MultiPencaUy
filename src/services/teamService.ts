@@ -5,7 +5,7 @@ import type { MatchWithRelations } from '../types/match'
 export async function fetchAllTeams(): Promise<TeamWithGroup[]> {
   const { data, error } = await supabase
     .from('teams')
-    .select('*, group:groups(id, name, order)')
+    .select('*, group:groups(id, name, order:sort_order)')
     .order('group_id')
     .order('group_position')
   if (error) throw error
@@ -38,7 +38,7 @@ const MATCH_SELECT = `
   home_score_et, away_score_et,
   home_score_pk, away_score_pk,
   winner_team_id,
-  phase:phases(id, name, order, has_extra_time, has_penalties),
+  phase:phases(id, name, order:sort_order, has_extra_time, has_penalties),
   group:groups(id, name),
   stadium:stadiums(id, name, city, country, timezone),
   home_team:teams!home_team_id(id, name, abbreviation, flag_url, is_confirmed, placeholder_name),
@@ -52,7 +52,7 @@ export interface TeamWithGroup extends Team {
 export async function fetchTeam(id: string): Promise<TeamWithGroup | null> {
   const { data, error } = await supabase
     .from('teams')
-    .select('*, group:groups(id, name, order)')
+    .select('*, group:groups(id, name, order:sort_order)')
     .eq('id', id)
     .single()
   if (error) return null

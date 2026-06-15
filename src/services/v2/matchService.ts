@@ -76,3 +76,30 @@ export async function fetchGroups(
   if (error) throw error
   return (data ?? []) as { id: string; name: string }[]
 }
+
+export async function fetchStadiums(
+  competitionId: string
+): Promise<{ id: string; name: string; city: string }[]> {
+  const { data, error } = await supabase
+    .from('stadiums')
+    .select('id, name, city')
+    .eq('competition_id', competitionId)
+    .order('name')
+  if (error) throw error
+  return (data ?? []) as { id: string; name: string; city: string }[]
+}
+
+// Edición directa de un partido (por match_id; RLS: cargador/admin de la competencia).
+export async function updateMatchData(
+  matchId: string,
+  data: {
+    match_datetime: string
+    home_team_id: string | null
+    away_team_id: string | null
+    home_slot_label: string | null
+    away_slot_label: string | null
+  }
+): Promise<void> {
+  const { error } = await supabase.from('matches').update(data).eq('id', matchId)
+  if (error) throw error
+}
