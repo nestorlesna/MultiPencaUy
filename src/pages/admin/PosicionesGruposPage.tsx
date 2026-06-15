@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ChevronDown, ChevronUp, AlertTriangle, RotateCcw } from 'lucide-react'
+import { ChevronDown, ChevronUp, AlertTriangle, RotateCcw, ArrowLeft } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
+import { fetchGroupStandingsV2 } from '../../services/v2/groupStandingsService'
 import {
-  fetchGroupStandings,
   saveGroupPositionOverrides,
   deleteGroupPositionOverrides,
 } from '../../services/groupService'
@@ -190,9 +191,11 @@ function GroupCard({ name, rows }: { name: string; rows: GroupStanding[] }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function PosicionesGruposPage() {
+  const { id: competitionId = '' } = useParams()
   const { data: standings = [], isLoading } = useQuery({
-    queryKey: ['group_standings'],
-    queryFn: () => fetchGroupStandings(),
+    queryKey: ['group_standings', competitionId],
+    queryFn: () => fetchGroupStandingsV2(competitionId),
+    enabled: !!competitionId,
   })
 
   const groups = useMemo(
@@ -208,6 +211,9 @@ export function PosicionesGruposPage() {
   return (
     <RequireAdmin>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+          <ArrowLeft size={14} /> Competencia
+        </Link>
         <div>
           <h1 className="text-xl font-bold text-text-primary">Posiciones de grupos</h1>
           <p className="text-xs text-text-muted mt-1">

@@ -1,10 +1,11 @@
 import { useState, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Search, Upload, Loader2 } from 'lucide-react'
+import { Search, Upload, Loader2, ArrowLeft } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { Modal } from '../../components/ui/Modal'
-import { fetchAllTeams, updateTeam, uploadTeamFlag } from '../../services/teamService'
+import { fetchTeamsByCompetition, updateTeam, uploadTeamFlag } from '../../services/v2/teamService'
 import type { TeamWithGroup } from '../../services/teamService'
 
 function FlagImg({ url, name }: { url: string | null; name: string }) {
@@ -220,12 +221,14 @@ function EditTeamModal({
 
 // ── Página principal ─────────────────────────────────────────────────────────
 export function EquiposAdminPage() {
+  const { id: competitionId = '' } = useParams()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<TeamWithGroup | null>(null)
 
   const { data: teams = [], isLoading } = useQuery({
-    queryKey: ['teams_admin'],
-    queryFn: fetchAllTeams,
+    queryKey: ['teams_admin', competitionId],
+    queryFn: () => fetchTeamsByCompetition(competitionId),
+    enabled: !!competitionId,
     staleTime: 1000 * 60 * 5,
   })
 
@@ -254,6 +257,9 @@ export function EquiposAdminPage() {
   return (
     <RequireAdmin>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+          <ArrowLeft size={14} /> Competencia
+        </Link>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h1 className="text-xl font-bold text-text-primary">Equipos</h1>
           <span className="text-xs text-text-muted">{teams.length} equipos</span>

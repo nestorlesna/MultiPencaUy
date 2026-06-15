@@ -42,7 +42,8 @@
       "Bash(rm -f supabase/migrations/.gitkeep)",
       "Bash(npx eslint *)",
       "Bash(echo \"=== exit: $? ===\")",
-      "PowerShell(npx tsc --noEmit)"
+      "PowerShell(npx tsc --noEmit)",
+      "PowerShell(npx eslint src/pages/admin/PartidosAdminPage.tsx src/pages/admin/EquiposAdminPage.tsx src/pages/admin/TercerosPage.tsx src/pages/admin/PosicionesGruposPage.tsx src/pages/admin/CombinacionesPage.tsx src/pages/admin/ResultAutoPage.tsx src/pages/admin/CompetenciaDetailPage.tsx src/services/v2/teamService.ts)"
     ]
   }
 }

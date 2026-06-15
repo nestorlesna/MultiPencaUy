@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { fetchCompetition } from '../../services/v2/adminService'
 
 interface ToolLink {
-  to: string
+  slug: string
   label: string
   desc: string
   icon: LucideIcon
@@ -16,12 +16,12 @@ interface ToolLink {
 
 // Herramientas del catálogo deportivo, scopeadas a la competencia.
 const CATALOG_TOOLS: ToolLink[] = [
-  { to: '/admin/equipos', label: 'Equipos', desc: 'Catálogo de equipos y banderas', icon: Flag },
-  { to: '/admin/partidos', label: 'Partidos', desc: 'Edición de partidos y sedes', icon: CalendarDays },
-  { to: '/admin/terceros', label: 'Mejores terceros', desc: 'Ranking de terceros (overrides)', icon: Medal },
-  { to: '/admin/posiciones-grupos', label: 'Posiciones de grupos', desc: 'Ajuste manual de posiciones', icon: ListOrdered },
-  { to: '/admin/combinaciones', label: 'Combinaciones 16avos', desc: 'Tabla FIFA de cruces', icon: Shuffle },
-  { to: '/admin/resultauto', label: 'Resultados Auto', desc: 'Consulta a APIs externas (solo lectura)', icon: Radio },
+  { slug: 'equipos', label: 'Equipos', desc: 'Catálogo de equipos y banderas', icon: Flag },
+  { slug: 'partidos', label: 'Partidos', desc: 'Edición de partidos y sedes', icon: CalendarDays },
+  { slug: 'terceros', label: 'Mejores terceros', desc: 'Ranking de terceros (overrides)', icon: Medal },
+  { slug: 'posiciones-grupos', label: 'Posiciones de grupos', desc: 'Ajuste manual de posiciones', icon: ListOrdered },
+  { slug: 'combinaciones', label: 'Combinaciones 16avos', desc: 'Tabla FIFA de cruces', icon: Shuffle },
+  { slug: 'resultauto', label: 'Resultados Auto', desc: 'Consulta a APIs externas (solo lectura)', icon: Radio },
 ]
 
 export function CompetenciaDetailPage() {
@@ -70,7 +70,7 @@ export function CompetenciaDetailPage() {
           Catálogo deportivo
         </h2>
         <div className="grid sm:grid-cols-2 gap-3">
-          {CATALOG_TOOLS.map(t => <ToolCard key={t.to} tool={t} />)}
+          {CATALOG_TOOLS.map(t => <ToolCard key={t.slug} tool={t} competitionId={comp.id} />)}
         </div>
       </section>
     </div>
@@ -85,8 +85,9 @@ function BackLink() {
   )
 }
 
-function ToolCard({ tool }: { tool: ToolLink }) {
-  const { icon: Icon, to, label, desc } = tool
+function ToolCard({ tool, competitionId }: { tool: ToolLink; competitionId: string }) {
+  const { icon: Icon, slug, label, desc } = tool
+  const to = `/admin/competencias/${competitionId}/${slug}`
   return (
     <Link to={to} className="card p-4 flex items-start gap-3 hover:border-primary/40 transition-colors group">
       <div className="w-9 h-9 rounded-lg bg-surface-2 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/10 transition-colors">

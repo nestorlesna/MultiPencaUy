@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { ChevronDown, ChevronUp, Play, Copy, Check, RefreshCw, ExternalLink } from 'lucide-react'
+import { Link, useParams } from 'react-router-dom'
+import { ChevronDown, ChevronUp, Play, Copy, Check, RefreshCw, ExternalLink, ArrowLeft } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { supabase } from '../../lib/supabase'
 
@@ -821,8 +822,13 @@ function ApiSection({
 // ── Página principal ──────────────────────────────────────────────────────────
 
 function ResultAutoContent() {
+  const { id: competitionId = '' } = useParams()
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+
+      <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+        <ArrowLeft size={14} /> Competencia
+      </Link>
 
       {/* Título */}
       <div>

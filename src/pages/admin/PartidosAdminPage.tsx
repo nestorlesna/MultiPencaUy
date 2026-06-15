@@ -1,13 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2, Search } from 'lucide-react'
+import { Loader2, Search, ArrowLeft } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { Modal } from '../../components/ui/Modal'
 import { TeamFlag } from '../../components/ui/TeamFlag'
-import { useMatches } from '../../hooks/useMatches'
-import { fetchAllTeams } from '../../services/teamService'
-import { supabase } from '../../lib/supabase'
+import { fetchMatches, fetchPhases, fetchStadiums, updateMatchData } from '../../services/v2/matchService'
+import { fetchTeamsByCompetition } from '../../services/v2/teamService'
 import type { MatchWithRelations } from '../../types/match'
 import type { TeamWithGroup } from '../../services/teamService'
 import { formatMatchDay, formatMatchTime } from '../../utils/datetime'
@@ -19,26 +19,6 @@ interface MatchEditInput {
   home_slot_label: string
   away_slot_label: string
   stadium_id: string
-}
-
-async function updateMatchData(matchId: string, data: {
-  match_datetime: string
-  home_team_id: string | null
-  away_team_id: string | null
-  home_slot_label: string | null
-  away_slot_label: string | null
-}) {
-  const { error } = await supabase.from('matches').update(data).eq('id', matchId)
-  if (error) throw error
-}
-
-async function fetchStadiums() {
-  const { data, error } = await supabase
-    .from('stadiums')
-    .select('id, name, city')
-    .order('name')
-  if (error) throw error
-  return (data ?? []) as { id: string; name: string; city: string }[]
 }
 
 // ── Convierte UTC ISO a valor para <input type="datetime-local"> ─────────────
@@ -221,32 +201,34 @@ function EditMatchModal({
   )
 }
 
-// ── Fases ────────────────────────────────────────────────────────────────────
-const PHASES = [
-  { label: 'Grupos', order: 1 },
-  { label: 'Dieciseisavos', order: 2 },
-  { label: 'Octavos', order: 3 },
-  { label: 'Cuartos', order: 4 },
-  { label: 'Semifinales', order: 5 },
-  { label: '3er Puesto', order: 6 },
-  { label: 'Final', order: 7 },
-]
-
 // ── Página principal ─────────────────────────────────────────────────────────
 export function PartidosAdminPage() {
+  const { id: competitionId = '' } = useParams()
   const [phaseOrder, setPhaseOrder] = useState(1)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<MatchWithRelations | null>(null)
 
-  const { data: matches = [], isLoading } = useMatches({ phaseOrder })
+  const { data: phases = [] } = useQuery({
+    queryKey: ['v2', 'phases', competitionId],
+    queryFn: () => fetchPhases(competitionId),
+    enabled: !!competitionId,
+  })
+  const { data: matches = [], isLoading } = useQuery({
+    queryKey: ['matches', competitionId, phaseOrder],
+    queryFn: () => fetchMatches(competitionId, { phaseOrder }),
+    enabled: !!competitionId,
+    staleTime: 1000 * 60 * 5,
+  })
   const { data: teams = [] } = useQuery({
-    queryKey: ['teams_admin'],
-    queryFn: fetchAllTeams,
+    queryKey: ['teams_admin', competitionId],
+    queryFn: () => fetchTeamsByCompetition(competitionId),
+    enabled: !!competitionId,
     staleTime: 1000 * 60 * 10,
   })
   const { data: stadiums = [] } = useQuery({
-    queryKey: ['stadiums'],
-    queryFn: fetchStadiums,
+    queryKey: ['stadiums', competitionId],
+    queryFn: () => fetchStadiums(competitionId),
+    enabled: !!competitionId,
     staleTime: Infinity,
   })
 
@@ -264,13 +246,16 @@ export function PartidosAdminPage() {
   return (
     <RequireAdmin>
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+        <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
+          <ArrowLeft size={14} /> Competencia
+        </Link>
         <h1 className="text-xl font-bold text-text-primary">Partidos</h1>
 
         {/* Phase tabs */}
         <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
-          {PHASES.map(p => (
+          {phases.map(p => (
             <button
-              key={p.order}
+              key={p.id}
               onClick={() => { setPhaseOrder(p.order); setSearch('') }}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 phaseOrder === p.order
@@ -278,7 +263,7 @@ export function PartidosAdminPage() {
                   : 'bg-surface-2 text-text-secondary hover:text-text-primary'
               }`}
             >
-              {p.label}
+              {p.name}
             </button>
           ))}
         </div>
