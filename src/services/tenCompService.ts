@@ -49,19 +49,18 @@ export async function fetchMyTenComps(userId: string): Promise<MyPenca[]> {
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
-// Pencas públicas activas para explorar / auto-seleccionar (más reciente primero).
-// Inner join a competition para excluir competencias draft/archivadas.
+// Pencas públicas para explorar / auto-seleccionar (más reciente primero).
+// Excluye solo las archivadas; sirve también de candidatas para EntryRedirect.
 export async function fetchPublicTenComps(): Promise<PublicPenca[]> {
   const { data, error } = await supabase
     .from('ten_comps')
     .select(
       `${TEN_COMP_COLS},
        tenant:tenant_id ( ${TENANT_COLS} ),
-       competition:competition_id!inner ( ${COMP_COLS} )`
+       competition:competition_id ( ${COMP_COLS} )`
     )
     .eq('visibility', 'public')
-    .eq('status', 'open')
-    .in('competition.status', ['active', 'finished'])
+    .neq('status', 'archived')
     .order('created_at', { ascending: false })
 
   if (error) throw error

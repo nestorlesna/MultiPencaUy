@@ -292,10 +292,13 @@ function BonusRow({ type, points, onSave }: { type: string; points: number; onSa
 }
 
 // ── Menú ──────────────────────────────────────────────────────────────────────
-const MENU_ITEMS: { key: keyof MenuConfig; label: string }[] = [
+// optIn: ítems que solo aplican a ciertos formatos (Posiciones → ligas todos-contra-todos).
+// Ocultos por defecto; requieren true explícito (igual que visibleMenuItems).
+const MENU_ITEMS: { key: keyof MenuConfig; label: string; optIn?: boolean }[] = [
   { key: 'fixture', label: 'Fixture' },
   { key: 'grupos', label: 'Grupos' },
   { key: 'cuadro', label: 'Cuadro' },
+  { key: 'posiciones', label: 'Posiciones', optIn: true },
   { key: 'ranking', label: 'Ranking' },
   { key: 'mis_predicciones', label: 'Jugar' },
   { key: 'mas_puntos', label: '+ Puntos' },
@@ -323,7 +326,7 @@ function MenuTab({ tenCompId, initial }: { tenCompId: string; initial: MenuConfi
       </p>
       <div className="space-y-2">
         {MENU_ITEMS.map(item => {
-          const enabled = menu[item.key] !== false
+          const enabled = item.optIn ? menu[item.key] === true : menu[item.key] !== false
           return (
             <button
               key={item.key}

@@ -46,6 +46,7 @@ import { PencaGruposPage } from './pages/penca/PencaGruposPage'
 import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
 import { PencaAdminPage } from './pages/penca/PencaAdminPage'
 import { PencaCuadroPage } from './pages/penca/PencaCuadroPage'
+import { PencaPosicionesPage } from './pages/penca/PencaPosicionesPage'
 import { PencaMasPuntosPage } from './pages/penca/PencaMasPuntosPage'
 import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
 import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
@@ -97,6 +98,7 @@ function AppContent() {
               <Route path="grupos"          element={<PencaGruposPage />} />
               <Route path="grupos/:grupo"   element={<PencaGrupoDetailPage />} />
               <Route path="cuadro"          element={<PencaCuadroPage />} />
+              <Route path="posiciones"      element={<PencaPosicionesPage />} />
               <Route path="ranking"         element={<PencaRankingPage />} />
               <Route path="mis-predicciones" element={<PencaMisPrediccionesPage />} />
               <Route path="mas-puntos"      element={<PencaMasPuntosPage />} />

@@ -41,6 +41,7 @@ export interface MenuConfig {
   grupos?: boolean
   cuadro?: boolean
   ranking?: boolean
+  posiciones?: boolean   // tabla de liga (todos contra todos); opt-in, solo visible si true
   mis_predicciones?: boolean
   mas_puntos?: boolean
   subgrupos?: boolean

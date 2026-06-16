@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { Calendar, HelpCircle, LayoutGrid, Trophy, Star, User, Users, Grid3x3, Award } from 'lucide-react'
+import { Calendar, HelpCircle, LayoutGrid, Trophy, Star, User, Users, Grid3x3, Award, ListOrdered } from 'lucide-react'
 import { Capacitor } from '@capacitor/core'
 import { useAuth } from '../../hooks/useAuth'
 import { useTenCompState } from '../../contexts/TenCompContext'
@@ -12,6 +12,7 @@ const isNative = Capacitor.isNativePlatform()
 const ICONS: Partial<Record<keyof MenuConfig, typeof Calendar>> = {
   fixture: Calendar,
   grupos: LayoutGrid,
+  posiciones: ListOrdered,
   ranking: Trophy,
   mis_predicciones: Star,
   cuadro: Grid3x3,
@@ -21,7 +22,7 @@ const ICONS: Partial<Record<keyof MenuConfig, typeof Calendar>> = {
 }
 // Orden de prioridad en mobile (se recortan a 4 según la penca).
 const PRIORITY: (keyof MenuConfig)[] = [
-  'fixture', 'grupos', 'ranking', 'mis_predicciones', 'cuadro', 'mas_puntos', 'subgrupos', 'ayuda',
+  'fixture', 'grupos', 'posiciones', 'ranking', 'mis_predicciones', 'cuadro', 'mas_puntos', 'subgrupos', 'ayuda',
 ]
 
 export function BottomNav() {

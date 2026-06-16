@@ -28,7 +28,7 @@ export interface MatchWithRelations {
     has_extra_time: boolean; has_penalties: boolean
   }
   group: { id: string; name: string } | null
-  stadium: { id: string; name: string; city: string; country: string; timezone: string }
+  stadium: { id: string; name: string; city: string; country: string; timezone: string } | null
   home_team: TeamInfo | null
   away_team: TeamInfo | null
 }
