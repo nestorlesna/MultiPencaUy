@@ -464,3 +464,205 @@ export async function populateKnockoutV2(competitionId: string): Promise<number>
   if (error) throw error
   return data as number
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// CLONAR COMPETENCIA
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface CloneCompetitionInput {
+  name: string
+  startDate: string  // YYYY-MM-DD — fecha de la jornada 1
+  mirror: boolean    // si true, local↔visitante se invierten en todos los partidos
+}
+
+export async function cloneCompetition(
+  sourceId: string,
+  opts: CloneCompetitionInput
+): Promise<Competition> {
+  const src = await fetchCompetition(sourceId)
+  if (!src) throw new Error('Competencia origen no encontrada')
+
+  // Fetch del catálogo completo en paralelo
+  const [phases, groups, stadiums, teams, matches, bonusTypes, ksr, combinaciones] =
+    await Promise.all([
+      supabase.from('phases').select('*').eq('competition_id', sourceId).order('sort_order')
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('groups').select('*').eq('competition_id', sourceId).order('sort_order')
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('stadiums').select('*').eq('competition_id', sourceId)
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('teams').select('*').eq('competition_id', sourceId)
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('matches').select('*').eq('competition_id', sourceId).order('match_datetime')
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('competition_bonus_types').select('*').eq('competition_id', sourceId)
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('knockout_slot_rules').select('*').eq('competition_id', sourceId)
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+      supabase.from('combinaciones').select('*').eq('competition_id', sourceId)
+        .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
+    ])
+
+  // Nueva competencia en estado draft
+  const newComp = await createCompetition({
+    name: opts.name,
+    sport: src.sport,
+    season: src.season,
+    status: 'draft',
+    start_date: opts.startDate,
+    advancement_engine: src.advancement_engine,
+  })
+  const cid = newComp.id
+
+  // Fases → mapa old_id → new_id (match por sort_order, que es UNIQUE por competencia)
+  const phaseIdMap = new Map<string, string>()
+  if (phases.length > 0) {
+    const { data: np, error } = await supabase.from('phases')
+      .insert(phases.map((p: any) => ({
+        competition_id: cid, name: p.name,
+        sort_order: p.sort_order, has_extra_time: p.has_extra_time, has_penalties: p.has_penalties,
+      })))
+      .select('id, sort_order')
+    if (error) throw error
+    for (const r of np ?? []) {
+      const old = phases.find((p: any) => p.sort_order === r.sort_order)
+      if (old) phaseIdMap.set(old.id, r.id)
+    }
+  }
+
+  // Grupos → mapa old_id → new_id
+  const groupIdMap = new Map<string, string>()
+  if (groups.length > 0) {
+    const { data: ng, error } = await supabase.from('groups')
+      .insert(groups.map((g: any) => ({
+        competition_id: cid, name: g.name, sort_order: g.sort_order,
+      })))
+      .select('id, name')
+    if (error) throw error
+    for (const r of ng ?? []) {
+      const old = groups.find((g: any) => g.name === r.name)
+      if (old) groupIdMap.set(old.id, r.id)
+    }
+  }
+
+  // Estadios → mapa old_id → new_id
+  const stadiumIdMap = new Map<string, string>()
+  if (stadiums.length > 0) {
+    const { data: ns, error } = await supabase.from('stadiums')
+      .insert(stadiums.map(({ id: _id, competition_id: _c, ...rest }: any) => ({
+        ...rest, competition_id: cid,
+      })))
+      .select('id, name')
+    if (error) throw error
+    for (const r of ns ?? []) {
+      const old = stadiums.find((s: any) => s.name === r.name)
+      if (old) stadiumIdMap.set(old.id, r.id)
+    }
+  }
+
+  // Equipos → mapa old_id → new_id (respeta nueva group_id)
+  const teamIdMap = new Map<string, string>()
+  if (teams.length > 0) {
+    const { data: nt, error } = await supabase.from('teams')
+      .insert(teams.map(({ id: _id, competition_id: _c, group_id: gid, ...rest }: any) => ({
+        ...rest,
+        competition_id: cid,
+        group_id: gid ? groupIdMap.get(gid) ?? null : null,
+      })))
+      .select('id, abbreviation')
+    if (error) throw error
+    for (const r of nt ?? []) {
+      const old = teams.find((t: any) => t.abbreviation === r.abbreviation)
+      if (old) teamIdMap.set(old.id, r.id)
+    }
+  }
+
+  // Cálculo de fechas: round_number define el offset (jornada 1 = startDate, jornada N = +7*(N-1) días)
+  // Para competencias sin round_number se agrupa por fecha UTC original.
+  const [startY, startM, startD] = opts.startDate.split('-').map(Number)
+  const startMs = Date.UTC(startY, startM - 1, startD)
+
+  const uniqueRounds = [...new Set(
+    (matches as any[]).filter(m => m.round_number != null).map(m => m.round_number as number)
+  )].sort((a, b) => a - b)
+
+  const uniqueDates = [...new Set(
+    (matches as any[]).filter(m => m.round_number == null).map(m => (m.match_datetime as string).slice(0, 10))
+  )].sort()
+
+  function calcDatetime(m: any): string {
+    const orig = new Date(m.match_datetime as string)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const time = `${pad(orig.getUTCHours())}:${pad(orig.getUTCMinutes())}:${pad(orig.getUTCSeconds())}`
+    const offsetDays = m.round_number != null
+      ? uniqueRounds.indexOf(m.round_number) * 7
+      : uniqueDates.indexOf((m.match_datetime as string).slice(0, 10)) * 7
+    const nd = new Date(startMs + offsetDays * 86_400_000)
+    const date = `${nd.getUTCFullYear()}-${pad(nd.getUTCMonth() + 1)}-${pad(nd.getUTCDate())}`
+    return `${date}T${time}Z`
+  }
+
+  // Partidos (sin resultados)
+  const matchIdMap = new Map<string, string>()
+  if (matches.length > 0) {
+    const { data: nm, error } = await supabase.from('matches')
+      .insert((matches as any[]).map(m => ({
+        competition_id: cid,
+        match_number:   m.match_number,
+        phase_id:       phaseIdMap.get(m.phase_id)!,
+        group_id:       m.group_id ? groupIdMap.get(m.group_id) ?? null : null,
+        home_team_id:   opts.mirror
+          ? (m.away_team_id ? teamIdMap.get(m.away_team_id) ?? null : null)
+          : (m.home_team_id ? teamIdMap.get(m.home_team_id) ?? null : null),
+        away_team_id:   opts.mirror
+          ? (m.home_team_id ? teamIdMap.get(m.home_team_id) ?? null : null)
+          : (m.away_team_id ? teamIdMap.get(m.away_team_id) ?? null : null),
+        home_slot_label: opts.mirror ? m.away_slot_label : m.home_slot_label,
+        away_slot_label: opts.mirror ? m.home_slot_label : m.away_slot_label,
+        stadium_id:     m.stadium_id ? stadiumIdMap.get(m.stadium_id) ?? null : null,
+        match_datetime: calcDatetime(m),
+        status:         'scheduled',
+        round_number:   m.round_number,
+      })))
+      .select('id, match_number')
+    if (error) throw error
+    for (const r of nm ?? []) {
+      const old = (matches as any[]).find(m => m.match_number === r.match_number)
+      if (old) matchIdMap.set(old.id, r.id)
+    }
+  }
+
+  // Bonus types
+  if (bonusTypes.length > 0) {
+    const { error } = await supabase.from('competition_bonus_types')
+      .insert((bonusTypes as any[]).map(({ competition_id: _c, ...rest }) => ({
+        ...rest, competition_id: cid,
+      })))
+    if (error) throw error
+  }
+
+  // Reglas de cruce knockout (si las hay — aplica a torneos como WC)
+  if (ksr.length > 0) {
+    const { error } = await supabase.from('knockout_slot_rules')
+      .insert((ksr as any[]).map(({ id: _id, competition_id: _c, match_id, source_match_id, source_group_id, slot, ...rest }) => ({
+        ...rest,
+        competition_id:  cid,
+        match_id:        matchIdMap.get(match_id)!,
+        source_match_id: source_match_id ? matchIdMap.get(source_match_id) ?? null : null,
+        source_group_id: source_group_id ? groupIdMap.get(source_group_id) ?? null : null,
+        slot:            opts.mirror ? (slot === 'home' ? 'away' : 'home') : slot,
+      })))
+    if (error) throw error
+  }
+
+  // Tabla de combinaciones de mejores terceros (WC48)
+  if (combinaciones.length > 0) {
+    const { error } = await supabase.from('combinaciones')
+      .insert((combinaciones as any[]).map(({ competition_id: _c, ...rest }) => ({
+        ...rest, competition_id: cid,
+      })))
+    if (error) throw error
+  }
+
+  return newComp
+}

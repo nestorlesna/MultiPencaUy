@@ -1,6 +1,6 @@
 import { Navigate, Link } from 'react-router-dom'
 import {
-  Building2, Trophy, UploadCloud, Users, Shield, ScrollText, LayoutGrid, Mail,
+  Building2, Trophy, UploadCloud, Users, Shield, ScrollText, LayoutGrid, Mail, Trash2,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,6 +22,7 @@ const OTROS_LINKS: AdminLink[] = [
   { to: '/admin/usuarios', label: 'Usuarios', desc: 'Gestión global de usuarios', icon: Users },
   { to: '/admin/correos', label: 'Correos', desc: 'Envío de correos a usuarios', icon: Mail },
   { to: '/admin/auditoria', label: 'Auditoría', desc: 'Historial de cambios de predicciones', icon: ScrollText },
+  { to: '/admin/limpieza', label: 'Limpieza de datos', desc: 'Borrado físico de competencias y tenants', icon: Trash2 },
 ]
 
 export function AdminHubPage() {

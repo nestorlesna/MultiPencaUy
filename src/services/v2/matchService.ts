@@ -4,7 +4,7 @@ import type { MatchWithRelations } from '../../types/match'
 // 'order:sort_order' alias mantiene el shape de MatchWithRelations (phase.order)
 // pese al renombre de columna en v2.
 const MATCH_SELECT = `
-  id, match_number, match_datetime, status,
+  id, match_number, round_number, match_datetime, status,
   home_slot_label, away_slot_label,
   home_score_90, away_score_90,
   home_score_et, away_score_et,
@@ -19,7 +19,7 @@ const MATCH_SELECT = `
 
 export async function fetchMatches(
   competitionId: string,
-  filters?: { phaseOrder?: number; groupName?: string }
+  filters?: { phaseOrder?: number; groupName?: string; roundNumber?: number }
 ): Promise<MatchWithRelations[]> {
   let query = supabase
     .from('matches')
@@ -48,6 +48,10 @@ export async function fetchMatches(
     if (group) query = query.eq('group_id', (group as { id: string }).id)
   }
 
+  if (filters?.roundNumber !== undefined) {
+    query = query.eq('round_number', filters.roundNumber)
+  }
+
   const { data, error } = await query
   if (error) throw error
   return (data ?? []) as unknown as MatchWithRelations[]
@@ -63,6 +67,22 @@ export async function fetchPhases(
     .order('sort_order')
   if (error) throw error
   return (data ?? []) as { id: string; name: string; order: number }[]
+}
+
+// Retorna los números de fecha distintos para una competencia tipo liga.
+// Vacío si la competencia no usa round_number (torneos con fases/grupos).
+export async function fetchRounds(
+  competitionId: string
+): Promise<number[]> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('round_number')
+    .eq('competition_id', competitionId)
+    .not('round_number', 'is', null)
+    .order('round_number')
+  if (error) throw error
+  const unique = [...new Set((data ?? []).map((r: { round_number: number }) => r.round_number))]
+  return unique
 }
 
 export async function fetchGroups(

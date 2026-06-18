@@ -23,6 +23,7 @@ export interface MatchWithRelations {
   home_score_pk: number | null
   away_score_pk: number | null
   winner_team_id: string | null
+  round_number: number | null
   phase: {
     id: string; name: string; order: number
     has_extra_time: boolean; has_penalties: boolean

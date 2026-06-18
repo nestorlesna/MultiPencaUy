@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
   Loader2, Users, SlidersHorizontal, ListChecks, Settings, ArrowLeft,
-  Check, Ban, RotateCcw, Copy, ShieldCheck,
+  Check, Ban, RotateCcw, Copy, ShieldCheck, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTenComp } from '../../contexts/TenCompContext'
+import { useAuth } from '../../hooks/useAuth'
 import {
   fetchMembers, approveMember, setMemberStatus,
   updateScoring, fetchBonusConfig, updateBonusPoints, updateMenuConfig, updateTenComp,
@@ -16,7 +17,7 @@ import type { MenuConfig, TenCompScoring } from '../../types/tenant'
 
 type Tab = 'miembros' | 'puntaje' | 'menu' | 'config'
 
-const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
+const ALL_TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: 'miembros', label: 'Miembros', icon: Users },
   { key: 'puntaje',  label: 'Puntaje',  icon: SlidersHorizontal },
   { key: 'menu',     label: 'Menú',     icon: ListChecks },
@@ -24,9 +25,23 @@ const TABS: { key: Tab; label: string; icon: typeof Users }[] = [
 ]
 
 export function PencaAdminPage() {
-  const { tenComp, isTenCompAdmin } = useTenComp()
-  const [tab, setTab] = useState<Tab>('miembros')
+  const { tenComp, competition, isTenCompAdmin } = useTenComp()
+  const { isSuperAdmin } = useAuth()
   const base = `/p/${tenComp.slug}`
+
+  // Menú y Config son solo para super-admin
+  const visibleTabs = isSuperAdmin
+    ? ALL_TABS
+    : ALL_TABS.filter(t => t.key === 'miembros' || t.key === 'puntaje')
+
+  const [tab, setTab] = useState<Tab>('miembros')
+  const activeTab = visibleTabs.find(t => t.key === tab) ? tab : 'miembros'
+
+  // Puntaje editable solo antes del primer partido (o siempre para super-admin)
+  const competitionStarted = competition.start_date
+    ? new Date(competition.start_date) <= new Date()
+    : false
+  const canEditScoring = isSuperAdmin || !competitionStarted
 
   if (!isTenCompAdmin) {
     return (
@@ -48,12 +63,12 @@ export function PencaAdminPage() {
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 border-b border-border">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {visibleTabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className={`px-3 py-1.5 text-sm rounded-lg whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
-              tab === key
+              activeTab === key
                 ? 'text-text-primary bg-surface-2'
                 : 'text-text-secondary hover:text-text-primary hover:bg-surface-2'
             }`}
@@ -63,10 +78,10 @@ export function PencaAdminPage() {
         ))}
       </div>
 
-      {tab === 'miembros' && <MembersTab tenCompId={tenComp.id} />}
-      {tab === 'puntaje'  && <ScoringTab tenCompId={tenComp.id} />}
-      {tab === 'menu'     && <MenuTab tenCompId={tenComp.id} initial={tenComp.menu_config ?? {}} />}
-      {tab === 'config'   && <ConfigTab />}
+      {activeTab === 'miembros' && <MembersTab tenCompId={tenComp.id} />}
+      {activeTab === 'puntaje'  && <ScoringTab tenCompId={tenComp.id} canEdit={canEditScoring} />}
+      {activeTab === 'menu'     && <MenuTab tenCompId={tenComp.id} initial={tenComp.menu_config ?? {}} />}
+      {activeTab === 'config'   && <ConfigTab />}
     </div>
   )
 }
@@ -189,7 +204,7 @@ const SCORING_FIELDS: { key: keyof Omit<TenCompScoring, 'ten_comp_id'>; label: s
   { key: 'correct_pk_winner_points',   label: 'Ganador en penales',       hint: 'Acertó quién ganó por penales' },
 ]
 
-function ScoringTab({ tenCompId }: { tenCompId: string }) {
+function ScoringTab({ tenCompId, canEdit }: { tenCompId: string; canEdit: boolean }) {
   const qc = useQueryClient()
   const { scoring } = useTenComp()
   const [form, setForm] = useState<Omit<TenCompScoring, 'ten_comp_id'>>(() => ({
@@ -227,6 +242,13 @@ function ScoringTab({ tenCompId }: { tenCompId: string }) {
 
   return (
     <div className="space-y-6">
+      {!canEdit && (
+        <div className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2.5 text-sm text-accent">
+          <Lock size={14} className="mt-0.5 flex-shrink-0" />
+          <span>La competencia ya inició. El puntaje no se puede modificar.</span>
+        </div>
+      )}
+
       <Section title="Puntaje de predicciones">
         <div className="space-y-2">
           {SCORING_FIELDS.map(f => (
@@ -238,16 +260,19 @@ function ScoringTab({ tenCompId }: { tenCompId: string }) {
               <input
                 type="number"
                 value={form[f.key]}
-                onChange={e => setForm(s => ({ ...s, [f.key]: Number(e.target.value) }))}
-                className="input w-16 text-center"
+                onChange={e => canEdit && setForm(s => ({ ...s, [f.key]: Number(e.target.value) }))}
+                className={`input w-16 text-center ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
                 min={0}
+                readOnly={!canEdit}
               />
             </div>
           ))}
         </div>
-        <button onClick={() => scoringMut.mutate()} disabled={scoringMut.isPending} className="btn-primary text-sm mt-3">
-          {scoringMut.isPending ? 'Guardando...' : 'Guardar puntaje'}
-        </button>
+        {canEdit && (
+          <button onClick={() => scoringMut.mutate()} disabled={scoringMut.isPending} className="btn-primary text-sm mt-3">
+            {scoringMut.isPending ? 'Guardando...' : 'Guardar puntaje'}
+          </button>
+        )}
       </Section>
 
       {bonusConfig.length > 0 && (
@@ -255,6 +280,7 @@ function ScoringTab({ tenCompId }: { tenCompId: string }) {
           <div className="space-y-2">
             {bonusConfig.map(b => (
               <BonusRow key={b.bonus_type} type={b.bonus_type} points={b.points}
+                canEdit={canEdit}
                 onSave={(points) => bonusMut.mutate({ type: b.bonus_type, points })} />
             ))}
           </div>
@@ -275,15 +301,21 @@ const BONUS_LABELS: Record<string, string> = {
   podio: 'Podio',
 }
 
-function BonusRow({ type, points, onSave }: { type: string; points: number; onSave: (p: number) => void }) {
+function BonusRow({ type, points, canEdit, onSave }: { type: string; points: number; canEdit: boolean; onSave: (p: number) => void }) {
   const [val, setVal] = useState(points)
   return (
     <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-surface-2">
       <p className="text-sm text-text-primary min-w-0">{BONUS_LABELS[type] ?? type}</p>
       <div className="flex items-center gap-2 flex-shrink-0">
-        <input type="number" value={val} onChange={e => setVal(Number(e.target.value))}
-          className="input w-16 text-center" min={0} />
-        {val !== points && (
+        <input
+          type="number"
+          value={val}
+          onChange={e => canEdit && setVal(Number(e.target.value))}
+          className={`input w-16 text-center ${!canEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+          min={0}
+          readOnly={!canEdit}
+        />
+        {canEdit && val !== points && (
           <button onClick={() => onSave(val)} className="btn-primary text-[11px] px-2.5 py-1">Guardar</button>
         )}
       </div>

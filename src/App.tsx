@@ -51,6 +51,7 @@ import { PencaMasPuntosPage } from './pages/penca/PencaMasPuntosPage'
 import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
 import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
 import { AdminHubPage } from './pages/admin/AdminHubPage'
+import { LimpiezaPage } from './pages/admin/LimpiezaPage'
 import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
 import { CompetenciasPage } from './pages/admin/CompetenciasPage'
 import { CompetenciaDetailPage } from './pages/admin/CompetenciaDetailPage'
@@ -124,6 +125,7 @@ function AppContent() {
             <Route path="admin/competencias/:id/combinaciones"     element={<CombinacionesPage />} />
             <Route path="admin/competencias/:id/resultauto"        element={<ResultAutoPage />} />
             <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
+            <Route path="admin/limpieza"      element={<LimpiezaPage />} />
 
             {/* Admin */}
             <Route path="admin/usuarios"    element={<UsuariosPage />} />

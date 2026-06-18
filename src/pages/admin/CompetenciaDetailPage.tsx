@@ -1,11 +1,14 @@
-import { useQuery } from '@tanstack/react-query'
-import { Navigate, Link, useParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Navigate, Link, useParams, useNavigate } from 'react-router-dom'
 import {
-  Loader2, ArrowLeft, Trophy, Flag, CalendarDays, Medal, ListOrdered, Shuffle, Radio,
+  Loader2, ArrowLeft, Trophy, Flag, CalendarDays, Medal, ListOrdered, Shuffle, Radio, Copy,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchCompetition } from '../../services/v2/adminService'
+import { fetchCompetition, cloneCompetition } from '../../services/v2/adminService'
+import { Modal } from '../../components/ui/Modal'
 
 interface ToolLink {
   slug: string
@@ -14,24 +17,120 @@ interface ToolLink {
   icon: LucideIcon
 }
 
-// Herramientas del catálogo deportivo, scopeadas a la competencia.
 const CATALOG_TOOLS: ToolLink[] = [
-  { slug: 'equipos', label: 'Equipos', desc: 'Catálogo de equipos y banderas', icon: Flag },
-  { slug: 'partidos', label: 'Partidos', desc: 'Edición de partidos y sedes', icon: CalendarDays },
-  { slug: 'terceros', label: 'Mejores terceros', desc: 'Ranking de terceros (overrides)', icon: Medal },
-  { slug: 'posiciones-grupos', label: 'Posiciones de grupos', desc: 'Ajuste manual de posiciones', icon: ListOrdered },
-  { slug: 'combinaciones', label: 'Combinaciones 16avos', desc: 'Tabla FIFA de cruces', icon: Shuffle },
-  { slug: 'resultauto', label: 'Resultados Auto', desc: 'Consulta a APIs externas (solo lectura)', icon: Radio },
+  { slug: 'equipos',           label: 'Equipos',               desc: 'Catálogo de equipos y banderas',       icon: Flag },
+  { slug: 'partidos',          label: 'Partidos',               desc: 'Edición de partidos y sedes',          icon: CalendarDays },
+  { slug: 'terceros',          label: 'Mejores terceros',       desc: 'Ranking de terceros (overrides)',       icon: Medal },
+  { slug: 'posiciones-grupos', label: 'Posiciones de grupos',   desc: 'Ajuste manual de posiciones',          icon: ListOrdered },
+  { slug: 'combinaciones',     label: 'Combinaciones 16avos',   desc: 'Tabla FIFA de cruces',                 icon: Shuffle },
+  { slug: 'resultauto',        label: 'Resultados Auto',        desc: 'Consulta a APIs externas (solo lectura)', icon: Radio },
 ]
 
+// ── Modal de clonación ───────────────────────────────────────────────────────
+function CloneModal({
+  open,
+  competitionName,
+  onClose,
+  onClone,
+}: {
+  open: boolean
+  competitionName: string
+  onClose: () => void
+  onClone: (name: string, startDate: string, mirror: boolean) => void
+}) {
+  const [name, setName] = useState(`${competitionName} (copia)`)
+  const [startDate, setStartDate] = useState('')
+  const [mirror, setMirror] = useState(false)
+
+  function handleSubmit() {
+    if (!name.trim()) { toast.error('Ingresá un nombre'); return }
+    if (!startDate)   { toast.error('Ingresá la fecha de inicio'); return }
+    onClone(name.trim(), startDate, mirror)
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Clonar competencia" size="sm">
+      <div className="space-y-4">
+
+        <div>
+          <label className="block text-xs text-text-secondary mb-1.5">Nombre de la nueva competencia</label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            className="input"
+            placeholder="Ej: Clausura UY 2026"
+            maxLength={100}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs text-text-secondary mb-1.5">
+            Fecha de inicio — Jornada 1
+          </label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="input"
+          />
+          <p className="text-[11px] text-text-muted mt-1">
+            La jornada 1 se agenda en esta fecha. Cada jornada posterior se suma 7 días.
+          </p>
+        </div>
+
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={mirror}
+            onChange={e => setMirror(e.target.checked)}
+            className="mt-0.5 accent-primary w-4 h-4 flex-shrink-0"
+          />
+          <span className="text-sm text-text-primary">
+            Espejo — invertir local/visitante
+            <span className="block text-xs text-text-muted mt-0.5">
+              Si un equipo era local pasa a ser visitante, y viceversa.
+            </span>
+          </span>
+        </label>
+
+        <div className="flex gap-2 pt-1">
+          <button className="btn-primary flex-1" onClick={handleSubmit}>
+            Clonar
+          </button>
+          <button className="btn-ghost flex-1 border border-border" onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── Página principal ─────────────────────────────────────────────────────────
 export function CompetenciaDetailPage() {
   const { id = '' } = useParams()
   const { user, loading, isSuperAdmin } = useAuth()
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [cloneOpen, setCloneOpen] = useState(false)
 
   const { data: comp, isLoading } = useQuery({
     queryKey: ['v2', 'competition', id],
     queryFn: () => fetchCompetition(id),
     enabled: isSuperAdmin && !!id,
+  })
+
+  const { mutate: doClone, isPending: cloning } = useMutation({
+    mutationFn: ({ name, startDate, mirror }: { name: string; startDate: string; mirror: boolean }) =>
+      cloneCompetition(id, { name, startDate, mirror }),
+    onSuccess: (newComp) => {
+      toast.success(`Competencia "${newComp.name}" creada`)
+      qc.invalidateQueries({ queryKey: ['v2', 'competitions'] })
+      setCloneOpen(false)
+      navigate(`/admin/competencias/${newComp.id}`)
+    },
+    onError: (e: Error) => toast.error(e.message),
   })
 
   if (loading) return null
@@ -54,15 +153,30 @@ export function CompetenciaDetailPage() {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
       <BackLink />
 
-      <div className="flex items-center gap-2">
-        <Trophy size={20} className="text-primary" />
-        <div>
-          <h1 className="text-xl font-bold text-text-primary">{comp.name}</h1>
-          <p className="text-xs text-text-muted">
-            {comp.sport}{comp.season ? ` · ${comp.season}` : ''}
-            {comp.advancement_engine ? ` · motor: ${comp.advancement_engine}` : ''}
-          </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Trophy size={20} className="text-primary flex-shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-text-primary">{comp.name}</h1>
+            <p className="text-xs text-text-muted">
+              {comp.sport}{comp.season ? ` · ${comp.season}` : ''}
+              {comp.advancement_engine ? ` · motor: ${comp.advancement_engine}` : ''}
+            </p>
+          </div>
         </div>
+
+        <button
+          onClick={() => setCloneOpen(true)}
+          disabled={cloning}
+          className="btn-ghost flex items-center gap-1.5 text-xs border border-border px-3 py-2 flex-shrink-0"
+          title="Clonar competencia"
+        >
+          {cloning
+            ? <Loader2 size={14} className="animate-spin" />
+            : <Copy size={14} />
+          }
+          Clonar
+        </button>
       </div>
 
       <section>
@@ -73,6 +187,13 @@ export function CompetenciaDetailPage() {
           {CATALOG_TOOLS.map(t => <ToolCard key={t.slug} tool={t} competitionId={comp.id} />)}
         </div>
       </section>
+
+      <CloneModal
+        open={cloneOpen}
+        competitionName={comp.name}
+        onClose={() => setCloneOpen(false)}
+        onClone={(name, startDate, mirror) => doClone({ name, startDate, mirror })}
+      />
     </div>
   )
 }

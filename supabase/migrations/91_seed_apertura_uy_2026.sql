@@ -40,24 +40,24 @@ ON CONFLICT (id) DO NOTHING;
 -- 2. EQUIPOS (16, sin grupo)
 -- ============================================================================
 
-INSERT INTO teams (competition_id, name, abbreviation, group_id, group_position, is_confirmed)
+INSERT INTO teams (competition_id, name, abbreviation, flag_url, group_id, group_position, is_confirmed)
 VALUES
-  ('c0a00000-0000-4000-8000-000000000001', 'Racing', 'RAC', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'D. Maldonado', 'DMA', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Albion', 'ALB', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Peñarol', 'PEN', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Central Español', 'CES', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'M.C. Torque', 'MCT', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Nacional', 'NAC', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Def. Sporting', 'DSP', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Liverpool', 'LIV', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Wanderers', 'WAN', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Danubio', 'DAN', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Cerro Largo', 'CLA', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Boston River', 'BRI', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Juventud', 'JUV', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Progreso', 'PRO', NULL, NULL, true),
-  ('c0a00000-0000-4000-8000-000000000001', 'Cerro', 'CER', NULL, NULL, true)
+  ('c0a00000-0000-4000-8000-000000000001', 'Racing',          'RAC', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-racing.png',                  NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'D. Maldonado',    'DMA', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-deportivo-maldonado.png',      NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Albion',          'ALB', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-albion.png',                   NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Peñarol',         'PEN', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-penarol.png',                  NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Central Español', 'CES', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-central-espanol.png',          NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'M.C. Torque',     'MCT', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-montevideo-city-torque.png',   NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Nacional',        'NAC', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-nacional.png',                 NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Def. Sporting',   'DSP', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-defensor-sporting.png',        NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Liverpool',       'LIV', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-liverpool.png',                NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Wanderers',       'WAN', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-wanderers.png',                NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Danubio',         'DAN', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-danubio.png',                  NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Cerro Largo',     'CLA', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-cerro-largo.png',              NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Boston River',    'BRI', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-boston-river.png',             NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Juventud',        'JUV', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-juventud.png',                 NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Progreso',        'PRO', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-progreso.png',                 NULL, NULL, true),
+  ('c0a00000-0000-4000-8000-000000000001', 'Cerro',           'CER', 'https://estadisticas.tenfield.com.uy/wp-content/uploads/2020/04/escudo-cerro.png',                    NULL, NULL, true)
 ON CONFLICT (competition_id, abbreviation) DO NOTHING;
 
 -- ============================================================================
@@ -68,13 +68,14 @@ ON CONFLICT (competition_id, abbreviation) DO NOTHING;
 
 INSERT INTO matches (competition_id, match_number, phase_id, group_id,
   home_team_id, away_team_id, match_datetime, status,
-  home_score_90, away_score_90, winner_team_id)
+  home_score_90, away_score_90, winner_team_id, round_number)
 SELECT 'c0a00000-0000-4000-8000-000000000001', f.match_number, 'c0a00000-0000-4000-8000-000000000003', NULL,
        th.id, ta.id, f.dt, 'finished',
        f.hs, f.vs,
        CASE WHEN f.hs > f.vs THEN th.id
             WHEN f.vs > f.hs THEN ta.id
-            ELSE NULL END
+            ELSE NULL END,
+       CEIL(f.match_number / 8.0)::SMALLINT
 FROM (VALUES
   (1, TIMESTAMPTZ '2026-02-06 16:00:00-03', 'Wanderers', 'Def. Sporting', 1, 1),
   (2, TIMESTAMPTZ '2026-02-06 16:00:00-03', 'Albion', 'Liverpool', 1, 2),
