@@ -206,6 +206,26 @@ Todos los servicios en `src/services/` reciben scope **explícito** como paráme
 
 Los cruces knockout se calculan via un dispatcher SQL que llama a la función configurada en `competitions.advancement_engine`. En v1 solo existe `wc48_best_thirds` (Mundial 48 equipos + mejores terceros, port de los scripts legacy). El dispatcher queda implementado para agregar motores sin tocar el resto del sistema.
 
+### Formatos de competencia soportados
+
+El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia es la configuración:
+
+| Formato | `advancement_engine` | Fases | Grupos | `round_number` | Tablas de posiciones |
+|---------|----------------------|-------|--------|----------------|----------------------|
+| Grupos + eliminatoria (Mundial) | `wc48_best_thirds` | varias | sí (A–L) | no | `group_standings` por grupo + cuadro |
+| Liga de tabla única (Apertura UY) | `NULL` | 1 ("Fase Regular") | no | sí (fechas) | tabla única vía `leagueStandingsService`, menú `posiciones` |
+| Liga por series (Intermedio UY) | `NULL` | 1 ("Fase Regular") | sí (una por serie) | sí (fechas) | una `group_standings` por serie, menú `grupos` |
+
+- **Intermedio UY 2026** (seed `supabase/migrations/95_seed_intermedio_uy_2026.sql`; Apertura es la `91`): 16 equipos en 2 series (grupos `A`/`B`), todos contra todos **dentro** de cada serie, 7 fechas, sin final. Cada serie lleva su propia tabla vía `group_standings` (desempate PTS→DG→GF). Como `groups.name` es `VARCHAR(4)`, las series se nombran `A`/`B` y la UI las muestra como "Grupo A/B".
+- **Admin de partidos** (`PartidosAdminPage`): además del filtro de fase ofrece filtro por grupo (Mundial/Intermedio) y por fecha (Apertura/Intermedio); cada uno aparece solo si la competencia tiene esos datos.
+
+### Clonado de competencias (con transformación de equipos)
+
+`clone_competition` está implementado en **frontend** como `cloneCompetition` (`src/services/v2/adminService.ts`), no como RPC. Duplica una competencia como template en estado `draft`:
+- Copia fases, grupos, estadios, equipos, partidos (sin resultados, `scheduled`), `knockout_slot_rules`, `combinaciones`, `competition_bonus_types` y los defaults `default_menu` / `default_scoring`.
+- Reagenda fechas: jornada 1 = `startDate`, cada jornada siguiente +7 días (usa `round_number`; sin él agrupa por fecha original). Opción `mirror` invierte local/visitante.
+- **Transformación de equipos:** un mapa opcional `old_team_id → { name, abbreviation, flag_url }` renombra cada equipo en la copia manteniendo intacta la estructura (series/grupos y fixture). El remapeo `old→new` se reconstruye por la **nueva** abreviatura, así sigue funcionando aunque se renombre todo. El modal precarga la identidad original, exige completar todas las filas y valida que las abreviaturas sean únicas.
+
 ### Flujo de cálculo de puntos
 
 1. Cargador (admin/loader de tenant) carga resultado → RPC `set_match_result(competition_id, match_id, ...)`

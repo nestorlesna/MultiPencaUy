@@ -118,8 +118,88 @@ export async function updateMatchData(
     away_team_id: string | null
     home_slot_label: string | null
     away_slot_label: string | null
+    round_number?: number | null
+    stadium_id?: string | null
   }
 ): Promise<void> {
   const { error } = await supabase.from('matches').update(data).eq('id', matchId)
+  if (error) throw error
+}
+
+// Garantiza que la competencia tenga al menos una fase (las ligas nuevas no traen
+// fase y matches.phase_id es NOT NULL). Devuelve el phase_id a usar.
+export async function ensureDefaultPhase(competitionId: string): Promise<string> {
+  const { data: existing, error: selErr } = await supabase
+    .from('phases')
+    .select('id')
+    .eq('competition_id', competitionId)
+    .order('sort_order')
+    .limit(1)
+    .maybeSingle()
+  if (selErr) throw selErr
+  if (existing) return (existing as { id: string }).id
+
+  const { data: row, error } = await supabase
+    .from('phases')
+    .insert({
+      competition_id: competitionId,
+      name: 'Fase Regular',
+      sort_order: 1,
+      has_extra_time: false,
+      has_penalties: false,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  return (row as { id: string }).id
+}
+
+// Crea un partido en una competencia tipo liga (sin grupo; jornada en round_number).
+export async function createMatch(
+  competitionId: string,
+  data: {
+    home_team_id: string | null
+    away_team_id: string | null
+    match_datetime: string
+    round_number?: number | null
+    stadium_id?: string | null
+  }
+): Promise<string> {
+  const phaseId = await ensureDefaultPhase(competitionId)
+
+  // Siguiente match_number (UNIQUE por competencia).
+  const { data: maxRow, error: maxErr } = await supabase
+    .from('matches')
+    .select('match_number')
+    .eq('competition_id', competitionId)
+    .order('match_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (maxErr) throw maxErr
+  const nextNumber = ((maxRow as { match_number: number } | null)?.match_number ?? 0) + 1
+
+  const { data: row, error } = await supabase
+    .from('matches')
+    .insert({
+      competition_id: competitionId,
+      match_number: nextNumber,
+      phase_id: phaseId,
+      group_id: null,
+      home_team_id: data.home_team_id || null,
+      away_team_id: data.away_team_id || null,
+      match_datetime: data.match_datetime,
+      status: 'scheduled',
+      round_number: data.round_number ?? null,
+      stadium_id: data.stadium_id || null,
+    })
+    .select('id')
+    .single()
+  if (error) throw error
+  return (row as { id: string }).id
+}
+
+// Elimina un partido. Falla por FK si tiene predicciones asociadas.
+export async function deleteMatch(matchId: string): Promise<void> {
+  const { error } = await supabase.from('matches').delete().eq('id', matchId)
   if (error) throw error
 }

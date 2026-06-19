@@ -33,6 +33,8 @@ export interface Competition {
   start_date: string | null
   end_date: string | null
   advancement_engine: string | null
+  default_menu: MenuConfig
+  default_scoring: ScoringConfig
 }
 
 // Qué ítems del menú ve un Ten-Comp. Ausente o true = visible.
@@ -73,6 +75,10 @@ export interface TenCompScoring {
   correct_et_result_points: number
   correct_pk_winner_points: number
 }
+
+// Puntaje "plantilla" de una competencia (competitions.default_scoring): mismos
+// campos que TenCompScoring pero sin atarse a un Ten-Comp.
+export type ScoringConfig = Omit<TenCompScoring, 'ten_comp_id'>
 
 type TenantSummary = Pick<Tenant, 'id' | 'name' | 'slug' | 'logo_url'>
 type CompetitionSummary = Pick<Competition, 'id' | 'name' | 'sport' | 'status'>

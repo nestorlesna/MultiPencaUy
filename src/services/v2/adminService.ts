@@ -6,6 +6,7 @@ import type {
   CompetitionStatus,
   TenCompScoring,
   MenuConfig,
+  ScoringConfig,
   TenantRoleName,
 } from '../../types/tenant'
 
@@ -151,7 +152,7 @@ export async function searchProfiles(term: string): Promise<ProfileLite[]> {
 // COMPETENCIAS (catálogo)
 // ════════════════════════════════════════════════════════════════════════════
 
-const COMP_COLS = 'id, name, sport, season, status, start_date, end_date, advancement_engine'
+const COMP_COLS = 'id, name, sport, season, status, start_date, end_date, advancement_engine, default_menu, default_scoring'
 
 export async function fetchCompetitions(): Promise<Competition[]> {
   const { data, error } = await supabase
@@ -180,6 +181,9 @@ export interface CompetitionInput {
   start_date?: string | null
   end_date?: string | null
   advancement_engine?: string | null
+  // Plantillas que se copian a cada Ten-Comp. Si se omiten, la DB aplica su default.
+  default_menu?: MenuConfig
+  default_scoring?: ScoringConfig
 }
 
 export async function createCompetition(input: CompetitionInput): Promise<Competition> {
@@ -193,6 +197,8 @@ export async function createCompetition(input: CompetitionInput): Promise<Compet
       start_date: input.start_date ?? null,
       end_date: input.end_date ?? null,
       advancement_engine: input.advancement_engine ?? null,
+      ...(input.default_menu !== undefined ? { default_menu: input.default_menu } : {}),
+      ...(input.default_scoring !== undefined ? { default_scoring: input.default_scoring } : {}),
     })
     .select(COMP_COLS)
     .single()
@@ -473,6 +479,11 @@ export interface CloneCompetitionInput {
   name: string
   startDate: string  // YYYY-MM-DD — fecha de la jornada 1
   mirror: boolean    // si true, local↔visitante se invierten en todos los partidos
+  // Transformación de equipos (opcional): por cada equipo ORIGEN (keyed by su id),
+  // la identidad (nombre/abreviatura/escudo) que tendrá en la nueva competencia.
+  // La estructura (grupos, fixture, jornadas) NO cambia: solo se renombra cada
+  // "casillero". Equipos ausentes del mapa se clonan tal cual.
+  teamMap?: Record<string, { name: string; abbreviation: string; flag_url: string | null }>
 }
 
 export async function cloneCompetition(
@@ -503,7 +514,7 @@ export async function cloneCompetition(
         .then(r => { if (r.error) throw r.error; return r.data ?? [] }),
     ])
 
-  // Nueva competencia en estado draft
+  // Nueva competencia en estado draft (hereda menú y scoring del template)
   const newComp = await createCompetition({
     name: opts.name,
     sport: src.sport,
@@ -511,6 +522,8 @@ export async function cloneCompetition(
     status: 'draft',
     start_date: opts.startDate,
     advancement_engine: src.advancement_engine,
+    default_menu: src.default_menu,
+    default_scoring: src.default_scoring,
   })
   const cid = newComp.id
 
@@ -560,20 +573,32 @@ export async function cloneCompetition(
     }
   }
 
-  // Equipos → mapa old_id → new_id (respeta nueva group_id)
+  // Equipos → mapa old_id → new_id (respeta nueva group_id y la transformación
+  // opcional opts.teamMap). El remapeo se hace por la NUEVA abreviatura (única por
+  // competencia), así sigue funcionando aunque el usuario renombre los equipos.
   const teamIdMap = new Map<string, string>()
   if (teams.length > 0) {
-    const { data: nt, error } = await supabase.from('teams')
-      .insert(teams.map(({ id: _id, competition_id: _c, group_id: gid, ...rest }: any) => ({
-        ...rest,
-        competition_id: cid,
-        group_id: gid ? groupIdMap.get(gid) ?? null : null,
-      })))
-      .select('id, abbreviation')
+    const abbrToSourceId = new Map<string, string>()  // nueva abreviatura → id origen
+    const rows = teams.map(t => {
+      const ov = opts.teamMap?.[t.id]
+      const newAbbr = (ov?.abbreviation ?? t.abbreviation).trim().toUpperCase()
+      abbrToSourceId.set(newAbbr, t.id)
+      return {
+        competition_id:   cid,
+        name:             ov?.name?.trim() || t.name,
+        abbreviation:     newAbbr,
+        flag_url:         ov ? (ov.flag_url?.trim() || null) : t.flag_url,
+        group_id:         t.group_id ? groupIdMap.get(t.group_id) ?? null : null,
+        group_position:   t.group_position,
+        is_confirmed:     t.is_confirmed,
+        placeholder_name: t.placeholder_name,
+      }
+    })
+    const { data: nt, error } = await supabase.from('teams').insert(rows).select('id, abbreviation')
     if (error) throw error
     for (const r of nt ?? []) {
-      const old = teams.find((t: any) => t.abbreviation === r.abbreviation)
-      if (old) teamIdMap.set(old.id, r.id)
+      const srcId = abbrToSourceId.get(String(r.abbreviation).trim().toUpperCase())
+      if (srcId) teamIdMap.set(srcId, r.id)
     }
   }
 

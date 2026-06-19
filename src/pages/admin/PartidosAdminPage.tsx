@@ -1,13 +1,14 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { Loader2, Search, ArrowLeft } from 'lucide-react'
+import { Loader2, Search, ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { Modal } from '../../components/ui/Modal'
 import { TeamFlag } from '../../components/ui/TeamFlag'
-import { fetchMatches, fetchPhases, fetchStadiums, updateMatchData } from '../../services/v2/matchService'
+import { fetchMatches, fetchPhases, fetchStadiums, fetchGroups, fetchRounds, updateMatchData, createMatch, deleteMatch } from '../../services/v2/matchService'
 import { fetchTeamsByCompetition } from '../../services/v2/teamService'
+import { fetchCompetition } from '../../services/v2/adminService'
 import type { MatchWithRelations } from '../../types/match'
 import type { TeamWithGroup } from '../../services/teamService'
 import { formatMatchDay, formatMatchTime } from '../../utils/datetime'
@@ -19,6 +20,7 @@ interface MatchEditInput {
   home_slot_label: string
   away_slot_label: string
   stadium_id: string
+  round_number: string     // jornada (Fecha N) — vacío si no aplica
 }
 
 // ── Convierte UTC ISO a valor para <input type="datetime-local"> ─────────────
@@ -29,66 +31,99 @@ function toLocalInput(utcIso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
-// ── Modal de edición ─────────────────────────────────────────────────────────
-function EditMatchModal({
-  match, teams, stadiums, onClose,
+// ── Modal de creación / edición ───────────────────────────────────────────────
+const EMPTY_FORM: MatchEditInput = {
+  match_datetime: '',
+  home_team_id: null,
+  away_team_id: null,
+  home_slot_label: '',
+  away_slot_label: '',
+  stadium_id: '',
+  round_number: '',
+}
+
+function formFromMatch(match: MatchWithRelations | null): MatchEditInput {
+  if (!match) return EMPTY_FORM
+  return {
+    match_datetime: toLocalInput(match.match_datetime),
+    home_team_id: match.home_team?.id ?? null,
+    away_team_id: match.away_team?.id ?? null,
+    home_slot_label: match.home_slot_label ?? '',
+    away_slot_label: match.away_slot_label ?? '',
+    stadium_id: match.stadium?.id ?? '',
+    round_number: match.round_number != null ? String(match.round_number) : '',
+  }
+}
+
+function MatchModal({
+  open, match, competitionId, teams, stadiums, isLeague, onClose,
 }: {
-  match: MatchWithRelations | null
+  open: boolean
+  match: MatchWithRelations | null   // null → modo creación
+  competitionId: string
   teams: TeamWithGroup[]
   stadiums: { id: string; name: string; city: string }[]
+  isLeague: boolean
   onClose: () => void
 }) {
   const qc = useQueryClient()
-  const [form, setForm] = useState<MatchEditInput>({
-    match_datetime: '',
-    home_team_id: null,
-    away_team_id: null,
-    home_slot_label: '',
-    away_slot_label: '',
-    stadium_id: '',
-  })
-
-  useEffect(() => {
-    if (!match) return
-    setForm({
-      match_datetime: toLocalInput(match.match_datetime),
-      home_team_id: match.home_team?.id ?? null,
-      away_team_id: match.away_team?.id ?? null,
-      home_slot_label: match.home_slot_label ?? '',
-      away_slot_label: match.away_slot_label ?? '',
-      stadium_id: match.stadium?.id ?? '',
-    })
-  }, [match?.id])
+  const isEdit = !!match
+  // El padre remonta este modal con `key`, así el estado parte de props sin efecto.
+  const [form, setForm] = useState<MatchEditInput>(() => formFromMatch(match))
 
   const { mutate: save, isPending } = useMutation({
     mutationFn: async () => {
-      if (!match) return
-      await updateMatchData(match.id, {
-        match_datetime: new Date(form.match_datetime).toISOString(),
-        home_team_id: form.home_team_id || null,
-        away_team_id: form.away_team_id || null,
-        home_slot_label: form.home_slot_label.trim() || null,
-        away_slot_label: form.away_slot_label.trim() || null,
-      })
+      const round = form.round_number.trim() === '' ? null : Number(form.round_number)
+      if (match) {
+        await updateMatchData(match.id, {
+          match_datetime: new Date(form.match_datetime).toISOString(),
+          home_team_id: form.home_team_id || null,
+          away_team_id: form.away_team_id || null,
+          home_slot_label: form.home_slot_label.trim() || null,
+          away_slot_label: form.away_slot_label.trim() || null,
+          round_number: round,
+          stadium_id: form.stadium_id || null,
+        })
+      } else {
+        await createMatch(competitionId, {
+          home_team_id: form.home_team_id || null,
+          away_team_id: form.away_team_id || null,
+          match_datetime: new Date(form.match_datetime).toISOString(),
+          round_number: round,
+          stadium_id: form.stadium_id || null,
+        })
+      }
     },
     onSuccess: () => {
-      toast.success(`Partido #${match?.match_number} actualizado`)
+      toast.success(isEdit ? `Partido #${match?.match_number} actualizado` : 'Partido creado')
       qc.invalidateQueries({ queryKey: ['matches'] })
+      qc.invalidateQueries({ queryKey: ['v2', 'phases', competitionId] })
       onClose()
     },
     onError: (e: Error) => toast.error(e.message),
+  })
+
+  const { mutate: remove, isPending: removing } = useMutation({
+    mutationFn: async () => { if (match) await deleteMatch(match.id) },
+    onSuccess: () => {
+      toast.success('Partido eliminado')
+      qc.invalidateQueries({ queryKey: ['matches'] })
+      onClose()
+    },
+    onError: () => toast.error('No se pudo eliminar: el partido tiene predicciones asociadas.'),
   })
 
   function set<K extends keyof MatchEditInput>(key: K, val: MatchEditInput[K]) {
     setForm(f => ({ ...f, [key]: val }))
   }
 
-  if (!match) return null
+  if (!open) return null
 
-  const isKnockout = !match.group
+  // Slots solo en eliminatorias de torneos con grupos (edición de un partido knockout).
+  const isKnockout = isEdit && !isLeague && !match!.group
 
   return (
-    <Modal open={!!match} onClose={onClose} title={`Partido #${match.match_number}`} size="md">
+    <Modal open={open} onClose={onClose} title={isEdit ? `Partido #${match!.match_number}` : 'Nuevo partido'} size="md">
       <div className="space-y-4">
 
         {/* Fecha y hora */}
@@ -100,10 +135,30 @@ function EditMatchModal({
             onChange={e => set('match_datetime', e.target.value)}
             className="input"
           />
-          <p className="text-[11px] text-text-muted mt-1">
-            Se guarda en UTC. Hora actual del partido: {formatMatchDay(match.match_datetime)} {formatMatchTime(match.match_datetime)}
-          </p>
+          {isEdit && (
+            <p className="text-[11px] text-text-muted mt-1">
+              Se guarda en UTC. Hora actual del partido: {formatMatchDay(match!.match_datetime)} {formatMatchTime(match!.match_datetime)}
+            </p>
+          )}
         </div>
+
+        {/* Jornada / Fecha (solo ligas) */}
+        {isLeague && (
+          <div>
+            <label className="block text-xs text-text-secondary mb-1.5">Jornada (Fecha)</label>
+            <input
+              type="number"
+              min={1}
+              value={form.round_number}
+              onChange={e => set('round_number', e.target.value)}
+              className="input"
+              placeholder="ej: 1"
+            />
+            <p className="text-[11px] text-text-muted mt-1">
+              Número de fecha de la liga (Fecha 1, Fecha 2, …).
+            </p>
+          </div>
+        )}
 
         {/* Equipos */}
         <div className="grid grid-cols-2 gap-3">
@@ -190,12 +245,22 @@ function EditMatchModal({
             onClick={() => save()}
             disabled={isPending || !form.match_datetime}
           >
-            {isPending ? 'Guardando...' : 'Guardar'}
+            {isPending ? 'Guardando...' : isEdit ? 'Guardar' : 'Crear partido'}
           </button>
           <button className="btn-ghost flex-1 border border-border" onClick={onClose}>
             Cancelar
           </button>
         </div>
+
+        {isEdit && isLeague && (
+          <button
+            className="w-full inline-flex items-center justify-center gap-1.5 text-xs text-error hover:text-error/80 transition-colors pt-1"
+            onClick={() => { if (confirm(`¿Eliminar el partido #${match!.match_number}?`)) remove() }}
+            disabled={removing}
+          >
+            <Trash2 size={13} /> {removing ? 'Eliminando...' : 'Eliminar partido'}
+          </button>
+        )}
       </div>
     </Modal>
   )
@@ -205,20 +270,57 @@ function EditMatchModal({
 export function PartidosAdminPage() {
   const { id: competitionId = '' } = useParams()
   const [phaseOrder, setPhaseOrder] = useState(1)
+  const [groupName, setGroupName] = useState<string | undefined>(undefined)
+  const [roundNumber, setRoundNumber] = useState<number | undefined>(undefined)
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<MatchWithRelations | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  const { data: comp } = useQuery({
+    queryKey: ['v2', 'competition', competitionId],
+    queryFn: () => fetchCompetition(competitionId),
+    enabled: !!competitionId,
+  })
+  const isLeague = !!comp && !comp.advancement_engine
 
   const { data: phases = [] } = useQuery({
     queryKey: ['v2', 'phases', competitionId],
     queryFn: () => fetchPhases(competitionId),
     enabled: !!competitionId,
   })
+  const { data: groups = [] } = useQuery({
+    queryKey: ['v2', 'groups', competitionId],
+    queryFn: () => fetchGroups(competitionId),
+    enabled: !!competitionId,
+    staleTime: 1000 * 60 * 10,
+  })
+  const { data: rounds = [] } = useQuery({
+    queryKey: ['v2', 'rounds', competitionId],
+    queryFn: () => fetchRounds(competitionId),
+    enabled: !!competitionId,
+    staleTime: 1000 * 60 * 10,
+  })
   const { data: matches = [], isLoading } = useQuery({
-    queryKey: ['matches', competitionId, phaseOrder],
-    queryFn: () => fetchMatches(competitionId, { phaseOrder }),
+    queryKey: ['matches', competitionId, phaseOrder, groupName, roundNumber],
+    queryFn: () => fetchMatches(competitionId, { phaseOrder, groupName, roundNumber }),
     enabled: !!competitionId,
     staleTime: 1000 * 60 * 5,
   })
+
+  // Los grupos y las fechas viven en la fase de grupos / fase regular (la primera).
+  // En knockout del Mundial no hay grupos; en ligas solo existe esa fase.
+  const groupPhaseOrder = phases[0]?.order
+  const onGroupPhase = phaseOrder === groupPhaseOrder
+  const showGroupFilter = groups.length > 0 && onGroupPhase
+  const showRoundFilter = rounds.length > 0 && onGroupPhase
+
+  // Al cambiar de fase, los filtros de grupo/fecha dejan de aplicar.
+  function selectPhase(order: number) {
+    setPhaseOrder(order)
+    setGroupName(undefined)
+    setRoundNumber(undefined)
+    setSearch('')
+  }
   const { data: teams = [] } = useQuery({
     queryKey: ['teams_admin', competitionId],
     queryFn: () => fetchTeamsByCompetition(competitionId),
@@ -249,14 +351,21 @@ export function PartidosAdminPage() {
         <Link to={`/admin/competencias/${competitionId}`} className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors">
           <ArrowLeft size={14} /> Competencia
         </Link>
-        <h1 className="text-xl font-bold text-text-primary">Partidos</h1>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h1 className="text-xl font-bold text-text-primary">Partidos</h1>
+          {isLeague && (
+            <button onClick={() => setCreating(true)} className="btn-primary text-sm inline-flex items-center gap-1.5">
+              <Plus size={14} /> Nuevo partido
+            </button>
+          )}
+        </div>
 
         {/* Phase tabs */}
         <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
           {phases.map(p => (
             <button
               key={p.id}
-              onClick={() => { setPhaseOrder(p.order); setSearch('') }}
+              onClick={() => selectPhase(p.order)}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 phaseOrder === p.order
                   ? 'bg-primary text-white'
@@ -267,6 +376,36 @@ export function PartidosAdminPage() {
             </button>
           ))}
         </div>
+
+        {/* Filtro por grupo (Mundial: grupos · Intermedio: series). Oculto si no hay grupos. */}
+        {showGroupFilter && (
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+            <FilterChip label="Todos los grupos" active={groupName === undefined} onClick={() => setGroupName(undefined)} />
+            {groups.map(g => (
+              <FilterChip
+                key={g.id}
+                label={`Grupo ${g.name}`}
+                active={groupName === g.name}
+                onClick={() => setGroupName(groupName === g.name ? undefined : g.name)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Filtro por fecha/jornada (Apertura, Intermedio). Oculto si no usa round_number. */}
+        {showRoundFilter && (
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+            <FilterChip label="Todas las fechas" active={roundNumber === undefined} onClick={() => setRoundNumber(undefined)} />
+            {rounds.map(r => (
+              <FilterChip
+                key={r}
+                label={`Fecha ${r}`}
+                active={roundNumber === r}
+                onClick={() => setRoundNumber(roundNumber === r ? undefined : r)}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Buscador */}
         <div className="relative">
@@ -298,7 +437,9 @@ export function PartidosAdminPage() {
               <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
                 {match.group
                   ? <span className="badge-primary text-[10px] font-semibold uppercase tracking-wide">Grupo {match.group.name}</span>
-                  : <span className="badge bg-accent/20 text-accent text-[10px] font-semibold uppercase tracking-wide">{match.phase.name}</span>
+                  : match.round_number != null
+                    ? <span className="badge-primary text-[10px] font-semibold uppercase tracking-wide">Fecha {match.round_number}</span>
+                    : <span className="badge bg-accent/20 text-accent text-[10px] font-semibold uppercase tracking-wide">{match.phase.name}</span>
                 }
                 <span className="text-text-muted text-[11px]">#{match.match_number}</span>
                 <span className="text-text-muted text-[11px]">·</span>
@@ -335,12 +476,29 @@ export function PartidosAdminPage() {
         </div>
       </div>
 
-      <EditMatchModal
+      <MatchModal
+        key={selected?.id ?? (creating ? 'new' : 'closed')}
+        open={!!selected || creating}
         match={selected}
+        competitionId={competitionId}
         teams={teams as TeamWithGroup[]}
         stadiums={stadiums}
-        onClose={() => setSelected(null)}
+        isLeague={isLeague}
+        onClose={() => { setSelected(null); setCreating(false) }}
       />
     </RequireAdmin>
+  )
+}
+
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-shrink-0 px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+        active ? 'bg-accent/20 text-accent' : 'text-text-muted hover:text-text-secondary'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
