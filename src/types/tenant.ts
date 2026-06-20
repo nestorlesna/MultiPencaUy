@@ -12,6 +12,7 @@ export interface Tenant {
   plan: string
   max_ten_comps: number | null
   max_members_per_ten_comp: number | null
+  notes: string | null
 }
 
 export type TenantRoleName = 'admin' | 'loader'

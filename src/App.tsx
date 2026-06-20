@@ -22,7 +22,6 @@ import { AuditoriaPage } from './pages/admin/AuditoriaPage'
 import { TercerosPage } from './pages/admin/TercerosPage'
 import { PosicionesGruposPage } from './pages/admin/PosicionesGruposPage'
 import { CombinacionesPage } from './pages/admin/CombinacionesPage'
-import { CorreosPage } from './pages/admin/CorreosPage'
 import { ResultAutoPage } from './pages/admin/ResultAutoPage'
 import { BracketPage } from './pages/BracketPage'
 import { MasPuntosPage } from './pages/MasPuntosPage'
@@ -132,7 +131,6 @@ function AppContent() {
             <Route path="admin/resultados"  element={<ResultadosPage />} />
             <Route path="admin/config"      element={<ConfigPage />} />
             <Route path="admin/auditoria"   element={<AuditoriaPage />} />
-            <Route path="admin/correos"           element={<CorreosPage />} />
             <Route path="*"                 element={<NotFoundPage />} />
           </Route>
         </Routes>

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
   Loader2, Users, SlidersHorizontal, ListChecks, Settings, ArrowLeft,
-  Check, Ban, RotateCcw, Copy, ShieldCheck, Lock,
+  Check, Ban, RotateCcw, Copy, ShieldCheck, Lock, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTenComp } from '../../contexts/TenCompContext'
@@ -13,13 +13,16 @@ import {
   updateScoring, fetchBonusConfig, updateBonusPoints, updateMenuConfig, updateTenComp,
   type MemberRow,
 } from '../../services/v2/adminService'
+import { CorreosTab } from '../../components/admin/CorreosTab'
+import type { EmailBrand } from '../../services/v2/emailService'
 import type { MenuConfig, TenCompScoring } from '../../types/tenant'
 
-type Tab = 'miembros' | 'puntaje' | 'menu' | 'config'
+type Tab = 'miembros' | 'puntaje' | 'correos' | 'menu' | 'config'
 
 const ALL_TABS: { key: Tab; label: string; icon: typeof Users }[] = [
   { key: 'miembros', label: 'Miembros', icon: Users },
   { key: 'puntaje',  label: 'Puntaje',  icon: SlidersHorizontal },
+  { key: 'correos',  label: 'Correos',  icon: Mail },
   { key: 'menu',     label: 'Menú',     icon: ListChecks },
   { key: 'config',   label: 'Config',   icon: Settings },
 ]
@@ -29,10 +32,10 @@ export function PencaAdminPage() {
   const { isSuperAdmin } = useAuth()
   const base = `/p/${tenComp.slug}`
 
-  // Menú y Config son solo para super-admin
+  // Menú y Config son solo para super-admin; Correos lo gestiona el admin de la penca.
   const visibleTabs = isSuperAdmin
     ? ALL_TABS
-    : ALL_TABS.filter(t => t.key === 'miembros' || t.key === 'puntaje')
+    : ALL_TABS.filter(t => t.key === 'miembros' || t.key === 'puntaje' || t.key === 'correos')
 
   const [tab, setTab] = useState<Tab>('miembros')
   const activeTab = visibleTabs.find(t => t.key === tab) ? tab : 'miembros'
@@ -80,6 +83,19 @@ export function PencaAdminPage() {
 
       {activeTab === 'miembros' && <MembersTab tenCompId={tenComp.id} />}
       {activeTab === 'puntaje'  && <ScoringTab tenCompId={tenComp.id} canEdit={canEditScoring} />}
+      {activeTab === 'correos'  && (
+        <CorreosTab
+          tenCompId={tenComp.id}
+          tenantId={tenComp.tenant_id}
+          competitionId={competition.id}
+          brand={{
+            pencaName: tenComp.name,
+            competitionName: competition.name,
+            slug: tenComp.slug,
+            baseUrl: window.location.origin,
+          } satisfies EmailBrand}
+        />
+      )}
       {activeTab === 'menu'     && <MenuTab tenCompId={tenComp.id} initial={tenComp.menu_config ?? {}} />}
       {activeTab === 'config'   && <ConfigTab />}
     </div>

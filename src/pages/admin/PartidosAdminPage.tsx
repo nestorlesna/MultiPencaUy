@@ -393,8 +393,9 @@ export function PartidosAdminPage() {
         )}
 
         {/* Filtro por fecha/jornada (Apertura, Intermedio). Oculto si no usa round_number. */}
+        {/* Se envuelve en varias filas: con muchas fechas no entran en una sola línea. */}
         {showRoundFilter && (
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+          <div className="flex flex-wrap gap-1 pb-1">
             <FilterChip label="Todas las fechas" active={roundNumber === undefined} onClick={() => setRoundNumber(undefined)} />
             {rounds.map(r => (
               <FilterChip

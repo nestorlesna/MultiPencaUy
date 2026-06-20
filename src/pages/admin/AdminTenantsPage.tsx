@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Navigate, Link } from 'react-router-dom'
 import {
-  Loader2, Building2, Plus, Users2, ExternalLink, Search, X, ShieldCheck, UploadCloud,
+  Loader2, Building2, Plus, Users2, ExternalLink, Search, X, ShieldCheck, UploadCloud, Pencil,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../hooks/useAuth'
 import { Modal } from '../../components/ui/Modal'
 import {
-  fetchTenants, createTenant,
+  fetchTenants, createTenant, updateTenant,
   fetchTenantRoles, assignTenantRole, removeTenantRole, searchProfiles,
   type TenantRoleRow, type ProfileLite,
 } from '../../services/v2/adminService'
@@ -23,6 +23,7 @@ export function AdminTenantsPage() {
   const qc = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
   const [managingRoles, setManagingRoles] = useState<Tenant | null>(null)
+  const [editing, setEditing] = useState<Tenant | null>(null)
 
   const { data: tenants = [], isLoading } = useQuery({
     queryKey: ['v2', 'tenants'],
@@ -56,7 +57,7 @@ export function AdminTenantsPage() {
         <div className="space-y-3">
           {tenants.length === 0 && <Empty>No hay empresas todavía. Creá la primera.</Empty>}
           {tenants.map(t => (
-            <TenantCard key={t.id} tenant={t} onManageRoles={() => setManagingRoles(t)} />
+            <TenantCard key={t.id} tenant={t} onManageRoles={() => setManagingRoles(t)} onEdit={() => setEditing(t)} />
           ))}
         </div>
       )}
@@ -70,11 +71,19 @@ export function AdminTenantsPage() {
       {managingRoles && (
         <RolesModal tenant={managingRoles} onClose={() => setManagingRoles(null)} />
       )}
+
+      {editing && (
+        <EditTenantModal
+          tenant={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => qc.invalidateQueries({ queryKey: ['v2', 'tenants'] })}
+        />
+      )}
     </div>
   )
 }
 
-function TenantCard({ tenant, onManageRoles }: { tenant: Tenant; onManageRoles: () => void }) {
+function TenantCard({ tenant, onManageRoles, onEdit }: { tenant: Tenant; onManageRoles: () => void; onEdit: () => void }) {
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between gap-3">
@@ -91,6 +100,9 @@ function TenantCard({ tenant, onManageRoles }: { tenant: Tenant; onManageRoles: 
           </p>
         </div>
         <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+          <button onClick={onEdit} className="btn-ghost text-[11px] px-2.5 py-1 inline-flex items-center gap-1 text-accent">
+            <Pencil size={12} /> Editar
+          </button>
           <button onClick={onManageRoles} className="btn-ghost text-[11px] px-2.5 py-1 inline-flex items-center gap-1">
             <Users2 size={12} /> Roles
           </button>
@@ -100,6 +112,93 @@ function TenantCard({ tenant, onManageRoles }: { tenant: Tenant; onManageRoles: 
         </div>
       </div>
     </div>
+  )
+}
+
+function EditTenantModal({ tenant, onClose, onSaved }: { tenant: Tenant; onClose: () => void; onSaved: () => void }) {
+  const [name, setName] = useState(tenant.name)
+  const [slug, setSlug] = useState(tenant.slug)
+  const [logoUrl, setLogoUrl] = useState(tenant.logo_url ?? '')
+  const [plan, setPlan] = useState(tenant.plan)
+  const [status, setStatus] = useState(tenant.status)
+  const [maxTenComps, setMaxTenComps] = useState(tenant.max_ten_comps != null ? String(tenant.max_ten_comps) : '')
+  const [maxMembers, setMaxMembers] = useState(tenant.max_members_per_ten_comp != null ? String(tenant.max_members_per_ten_comp) : '')
+  const [notes, setNotes] = useState(tenant.notes ?? '')
+
+  const mut = useMutation({
+    mutationFn: () => updateTenant(tenant.id, {
+      name: name.trim(),
+      slug: slug.trim(),
+      logo_url: logoUrl.trim() || null,
+      plan: plan.trim() || 'free',
+      status,
+      max_ten_comps: maxTenComps ? Number(maxTenComps) : null,
+      max_members_per_ten_comp: maxMembers ? Number(maxMembers) : null,
+      notes: notes.trim() || null,
+    }),
+    onSuccess: () => {
+      toast.success('Empresa actualizada')
+      onSaved()
+      onClose()
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const valid = name.trim() && slug.trim()
+
+  return (
+    <Modal open onClose={onClose} title={`Editar · ${tenant.name}`}>
+      <form
+        onSubmit={e => { e.preventDefault(); if (valid) mut.mutate() }}
+        className="space-y-4"
+      >
+        <Field label="Nombre">
+          <input className="input w-full" value={name} autoFocus onChange={e => setName(e.target.value)} />
+        </Field>
+        <Field label="Slug (URL)">
+          <input className="input w-full font-mono" value={slug} onChange={e => setSlug(slugify(e.target.value))} />
+        </Field>
+        <Field label="Logo (URL)">
+          <input className="input w-full" value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..." />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Plan">
+            <input className="input w-full" value={plan} onChange={e => setPlan(e.target.value)} placeholder="free" />
+          </Field>
+          <Field label="Estado">
+            <div className="flex gap-2">
+              {(['active', 'suspended'] as const).map(s => (
+                <button key={s} type="button" onClick={() => setStatus(s)}
+                  className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    status === s
+                      ? (s === 'active' ? 'bg-success text-white' : 'bg-error text-white')
+                      : 'bg-surface-2 text-text-secondary'
+                  }`}>
+                  {s === 'active' ? 'Activa' : 'Suspendida'}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Máx. pencas (vacío = ∞)">
+            <input className="input w-full" type="number" min={1} value={maxTenComps}
+              onChange={e => setMaxTenComps(e.target.value)} placeholder="∞" />
+          </Field>
+          <Field label="Máx. miembros/penca">
+            <input className="input w-full" type="number" min={1} value={maxMembers}
+              onChange={e => setMaxMembers(e.target.value)} placeholder="∞" />
+          </Field>
+        </div>
+        <Field label="Notas (internas)">
+          <textarea className="input w-full min-h-[64px] resize-y" value={notes}
+            onChange={e => setNotes(e.target.value)} placeholder="Notas del super-admin..." />
+        </Field>
+        <button type="submit" disabled={mut.isPending || !valid} className="btn-primary w-full">
+          {mut.isPending ? <Loader2 size={16} className="animate-spin mx-auto" /> : 'Guardar cambios'}
+        </button>
+      </form>
+    </Modal>
   )
 }
 

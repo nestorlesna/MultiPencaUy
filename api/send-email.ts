@@ -19,19 +19,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
   if (authError || !user) return res.status(401).json({ error: 'Token inválido' })
 
-  // Verificar que sea admin
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.is_admin) return res.status(403).json({ error: 'No autorizado' })
-
   const { email_id } = req.body as { email_id: string }
   if (!email_id) return res.status(400).json({ error: 'Falta email_id' })
 
-  // Obtener el correo de la cola
+  // Obtener el correo de la cola (incluye tenant_id para autorización + branding)
   const { data: email, error: fetchError } = await supabaseAdmin
     .from('email_queue')
     .select('*')
@@ -40,7 +31,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (fetchError || !email) return res.status(404).json({ error: 'Correo no encontrado' })
 
-  // Configurar transporte SMTP
+  // ── Autorización v2: super-admin global o admin del tenant dueño del correo ──
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('is_super_admin')
+    .eq('id', user.id)
+    .single()
+
+  let authorized = profile?.is_super_admin === true
+  if (!authorized && email.tenant_id) {
+    const { data: role } = await supabaseAdmin
+      .from('tenant_roles')
+      .select('role')
+      .eq('tenant_id', email.tenant_id)
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle()
+    authorized = !!role
+  }
+  if (!authorized) return res.status(403).json({ error: 'No autorizado' })
+
+  // ── Branding del "from": nombre del tenant (emisor de plataforma) ──
+  let fromName = process.env.SMTP_FROM_NAME ?? 'PencaLes'
+  if (email.tenant_id) {
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('name')
+      .eq('id', email.tenant_id)
+      .maybeSingle()
+    if (tenant?.name) fromName = tenant.name
+  }
+
+  // Configurar transporte SMTP (global de plataforma)
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
     port: parseInt(process.env.SMTP_PORT ?? '587'),
@@ -53,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     await transporter.sendMail({
-      from: `"${process.env.SMTP_FROM_NAME ?? 'PencaLes 2026'}" <${process.env.SMTP_USER}>`,
+      from: `"${fromName}" <${process.env.SMTP_USER}>`,
       to: `"${email.to_name}" <${email.to_email}>`,
       subject: email.subject,
       html: email.body_html,

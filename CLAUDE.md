@@ -82,6 +82,7 @@ Font: Inter. UI y rutas en español.
 ### Estructura de directorios
 
 ```
+api/                      # Vercel serverless (Node) — send-email.ts (SMTP global), feeds deportivos
 src/
 ├── main.tsx
 ├── App.tsx               # BrowserRouter + Routes
@@ -89,7 +90,7 @@ src/
 ├── components/
 │   ├── ui/               # Modal, Badge, Button, Input, TeamFlag, etc.
 │   ├── layout/           # Layout.tsx, BottomNav.tsx, Header.tsx
-│   ├── admin/            # ResultForm
+│   ├── admin/            # ResultFormV2, CorreosTab (panel de correos por penca)
 │   ├── groups/           # GroupTable
 │   └── matches/          # MatchCard, PredictionModal
 ├── hooks/                # useAuth, useTenComp (contexto activo), useMatches, etc.
@@ -106,6 +107,7 @@ src/
 │   ├── AuthPage.tsx / PerfilPage.tsx / NotFoundPage.tsx
 │   └── admin/            # ResultadosPage, PartidosAdminPage, etc.
 ├── services/             # Funciones de query Supabase (no hooks)
+│   ├── v2/               # Servicios multi-tenant: adminService, emailService, matchService, leaderboardService, ...
 │   ├── matchService.ts
 │   ├── predictionService.ts
 │   ├── bonusService.ts
@@ -217,7 +219,8 @@ El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia e
 | Liga por series (Intermedio UY) | `NULL` | 1 ("Fase Regular") | sí (una por serie) | sí (fechas) | una `group_standings` por serie, menú `grupos` |
 
 - **Intermedio UY 2026** (seed `supabase/migrations/95_seed_intermedio_uy_2026.sql`; Apertura es la `91`): 16 equipos en 2 series (grupos `A`/`B`), todos contra todos **dentro** de cada serie, 7 fechas, sin final. Cada serie lleva su propia tabla vía `group_standings` (desempate PTS→DG→GF). Como `groups.name` es `VARCHAR(4)`, las series se nombran `A`/`B` y la UI las muestra como "Grupo A/B".
-- **Admin de partidos** (`PartidosAdminPage`): además del filtro de fase ofrece filtro por grupo (Mundial/Intermedio) y por fecha (Apertura/Intermedio); cada uno aparece solo si la competencia tiene esos datos.
+- **Eliminatoria Sudamericana 2026** (seed `supabase/migrations/96_seed_eliminatoria_sudamericana_2026.sql`): liga de tabla única (como Apertura). 10 selecciones CONMEBOL, todos contra todos ida y vuelta = 18 fechas / 90 partidos que suman a una sola tabla (sin dividir 1ra/2da rueda). `round_number` = fecha; cargada con resultados reales (status `finished`).
+- **Admin de partidos** (`PartidosAdminPage`): además del filtro de fase ofrece filtro por grupo (Mundial/Intermedio) y por fecha (Apertura/Intermedio/Eliminatoria); cada uno aparece solo si la competencia tiene esos datos. El filtro de fecha se envuelve en varias filas (`flex-wrap`) para competencias con muchas fechas.
 
 ### Clonado de competencias (con transformación de equipos)
 
@@ -240,6 +243,16 @@ En v2 la columna se renombró a `sort_order` para evitar el conflicto con el par
 ### Bonus por Ten-Comp
 
 Los tipos de bonus (podio, empates, rango de goles, etc.) se definen por competencia en `competition_bonus_types`. Al crear un Ten-Comp se copian a `bonus_config` si `bonus_enabled = true`. El tenant-admin puede editar los puntos pero no agregar tipos. Si `bonus_enabled = false`, el Ten-Comp no tiene sección de bonus.
+
+### Correos (multi-tenant)
+
+**Emisor de plataforma:** un único SMTP global (env vars `SMTP_HOST/PORT/USER/PASS/SECURE/FROM_NAME`) en `api/send-email.ts` (Vercel serverless + nodemailer). No hay SMTP por-tenant; lo único que varía por penca es el **branding**: el "from name" se deriva del nombre del tenant y las URLs/textos del cuerpo salen del Ten-Comp y su competencia (sin config extra en el tenant).
+
+- **Alcance por penca:** el panel es el tab **"Correos"** en `PencaAdminPage` (`/p/:slug/admin`) — componente `src/components/admin/CorreosTab.tsx`. Lo gestiona el admin de la penca (tenant-admin incluido). Cada destinatario es un miembro **aprobado** de ese Ten-Comp.
+- **Servicio:** `src/services/v2/emailService.ts` — todo scopeado por `tenCompId`; builders de HTML parametrizados por `EmailBrand`. Usa las RPCs `admin_get_user_details(p_ten_comp)` (emails + conteo de predicciones) y `admin_get_match_predictions(p_ten_comp, p_match_id)`, ambas guardadas por `is_ten_comp_admin`.
+- **Cola `email_queue`** (en `01_schema.sql`): trae `tenant_id` + `ten_comp_id`; RLS `is_tenant_admin`. `api/send-email.ts` autoriza con super-admin **o** admin del tenant dueño del correo.
+- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Pendiente:** auto-disparo de "resultado cargado" al cargar un resultado (hoy es manual desde el tab).
 
 ### Migración de datos (post 19/07/2026)
 

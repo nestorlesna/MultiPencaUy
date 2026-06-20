@@ -15,7 +15,7 @@ import type {
 // ════════════════════════════════════════════════════════════════════════════
 
 const TENANT_COLS =
-  'id, name, slug, logo_url, status, plan, max_ten_comps, max_members_per_ten_comp'
+  'id, name, slug, logo_url, status, plan, max_ten_comps, max_members_per_ten_comp, notes'
 
 export async function fetchTenants(): Promise<Tenant[]> {
   const { data, error } = await supabase
@@ -34,6 +34,7 @@ export interface TenantInput {
   plan?: string
   max_ten_comps?: number | null
   max_members_per_ten_comp?: number | null
+  notes?: string | null
 }
 
 export async function createTenant(input: TenantInput): Promise<Tenant> {
