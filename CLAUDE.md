@@ -82,7 +82,7 @@ Font: Inter. UI y rutas en español.
 ### Estructura de directorios
 
 ```
-api/                      # Vercel serverless (Node) — send-email.ts (SMTP global), feeds deportivos
+api/                      # Vercel serverless (Node) — send-email.ts (SMTP global), admin-reset-password.ts, feeds deportivos
 src/
 ├── main.tsx
 ├── App.tsx               # BrowserRouter + Routes
@@ -170,6 +170,7 @@ export const supabase = createClient(
 - `is_super_admin` en profiles para acceso a toda la plataforma
 - RLS usa funciones helper `SECURITY DEFINER`: `is_super_admin()`, `is_tenant_admin(tenant_id)`, `is_tenant_loader(tenant_id)`, `is_approved_member(ten_comp_id)`
 - Lock de predicciones: RLS usa `now()` del servidor — inmune a manipulación de reloj
+- **Reseteo de contraseña por admin:** endpoint `api/admin-reset-password.ts` (service role) setea una pass temporal autogenerada vía `auth.admin.updateUserById` y prende `profiles.must_change_password`. Autoriza a super-admin o al admin de un tenant donde el target es miembro. Botón "Pass" en el tab Miembros (`PencaAdminPage` → `resetUserPassword`). El gate en `Layout` bloquea la app con `ForcePasswordChange` mientras `must_change_password = true`; al setear la nueva pass el dueño apaga el flag (permitido por `profiles_update_own`). Migración `97`.
 
 ### Tablas principales v2
 
@@ -228,6 +229,7 @@ El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia e
 - Copia fases, grupos, estadios, equipos, partidos (sin resultados, `scheduled`), `knockout_slot_rules`, `combinaciones`, `competition_bonus_types` y los defaults `default_menu` / `default_scoring`.
 - Reagenda fechas: jornada 1 = `startDate`, cada jornada siguiente +7 días (usa `round_number`; sin él agrupa por fecha original). Opción `mirror` invierte local/visitante.
 - **Transformación de equipos:** un mapa opcional `old_team_id → { name, abbreviation, flag_url }` renombra cada equipo en la copia manteniendo intacta la estructura (series/grupos y fixture). El remapeo `old→new` se reconstruye por la **nueva** abreviatura, así sigue funcionando aunque se renombre todo. El modal precarga la identidad original, exige completar todas las filas y valida que las abreviaturas sean únicas.
+- **Penca en Publico automática:** al terminar el clonado se crea una penca pública (Ten-Comp) en el tenant **Publico** vía `createPublicoTenComp` (slug libre derivado del nombre, `visibility: public`, `bonus_enabled: false`). Una competencia es catálogo **global** (no pertenece a un tenant); lo que la asocia a una empresa es un Ten-Comp. Si falla la creación de la penca (o no existe el tenant Publico) la competencia clonada **no** se revierte: se avisa por toast. Para sumarla a otros tenants: `/t/:slug/admin` → "Nueva penca" (el selector incluye competencias en `draft`).
 
 ### Flujo de cálculo de puntos
 

@@ -3,16 +3,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
   Loader2, Users, SlidersHorizontal, ListChecks, Settings, ArrowLeft,
-  Check, Ban, RotateCcw, Copy, ShieldCheck, Lock, Mail,
+  Check, Ban, RotateCcw, Copy, ShieldCheck, Lock, Mail, KeyRound,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTenComp } from '../../contexts/TenCompContext'
 import { useAuth } from '../../hooks/useAuth'
 import {
-  fetchMembers, approveMember, setMemberStatus,
+  fetchMembers, approveMember, setMemberStatus, resetUserPassword,
   updateScoring, fetchBonusConfig, updateBonusPoints, updateMenuConfig, updateTenComp,
   type MemberRow,
 } from '../../services/v2/adminService'
+import { Modal } from '../../components/ui/Modal'
 import { CorreosTab } from '../../components/admin/CorreosTab'
 import type { EmailBrand } from '../../services/v2/emailService'
 import type { MenuConfig, TenCompScoring } from '../../types/tenant'
@@ -127,6 +128,18 @@ function MembersTab({ tenCompId }: { tenCompId: string }) {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const [resetInfo, setResetInfo] = useState<{ name: string; password: string } | null>(null)
+  const resetMut = useMutation({
+    mutationFn: (member: MemberRow) => resetUserPassword(member.user_id),
+    onSuccess: (password, member) =>
+      setResetInfo({ name: member.display_name || member.username || 'Usuario', password }),
+    onError: (e: Error) => toast.error(e.message),
+  })
+  const onReset = (m: MemberRow) => {
+    if (confirm(`¿Resetear la contraseña de ${m.display_name || m.username || 'este usuario'}? Tendrá que cambiarla en el próximo ingreso.`))
+      resetMut.mutate(m)
+  }
+
   if (isLoading) return <Spinner />
 
   const pending = members.filter(m => m.status === 'pending')
@@ -138,7 +151,7 @@ function MembersTab({ tenCompId }: { tenCompId: string }) {
       {pending.length > 0 && (
         <Section title={`Pendientes de aprobación (${pending.length})`}>
           {pending.map(m => (
-            <MemberItem key={m.user_id} member={m}>
+            <MemberItem key={m.user_id} member={m} onReset={() => onReset(m)} resetting={resetMut.isPending}>
               <button
                 onClick={() => approveMut.mutate(m.user_id)}
                 disabled={approveMut.isPending}
@@ -161,7 +174,7 @@ function MembersTab({ tenCompId }: { tenCompId: string }) {
       <Section title={`Aprobados (${approved.length})`}>
         {approved.length === 0 && <Empty>No hay miembros aprobados todavía.</Empty>}
         {approved.map(m => (
-          <MemberItem key={m.user_id} member={m}>
+          <MemberItem key={m.user_id} member={m} onReset={() => onReset(m)} resetting={resetMut.isPending}>
             <button
               onClick={() => statusMut.mutate({ userId: m.user_id, status: 'blocked' })}
               disabled={statusMut.isPending}
@@ -176,7 +189,7 @@ function MembersTab({ tenCompId }: { tenCompId: string }) {
       {blocked.length > 0 && (
         <Section title={`Bloqueados (${blocked.length})`}>
           {blocked.map(m => (
-            <MemberItem key={m.user_id} member={m}>
+            <MemberItem key={m.user_id} member={m} onReset={() => onReset(m)} resetting={resetMut.isPending}>
               <button
                 onClick={() => statusMut.mutate({ userId: m.user_id, status: 'approved' })}
                 disabled={statusMut.isPending}
@@ -188,11 +201,17 @@ function MembersTab({ tenCompId }: { tenCompId: string }) {
           ))}
         </Section>
       )}
+
+      {resetInfo && (
+        <ResetPasswordModal name={resetInfo.name} password={resetInfo.password} onClose={() => setResetInfo(null)} />
+      )}
     </div>
   )
 }
 
-function MemberItem({ member, children }: { member: MemberRow; children: React.ReactNode }) {
+function MemberItem({ member, onReset, resetting, children }: {
+  member: MemberRow; onReset?: () => void; resetting?: boolean; children: React.ReactNode
+}) {
   const name = member.display_name || member.username || 'Usuario'
   return (
     <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-surface-2">
@@ -205,8 +224,48 @@ function MemberItem({ member, children }: { member: MemberRow; children: React.R
           {member.username && <p className="text-[11px] text-text-muted truncate">@{member.username}</p>}
         </div>
       </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">{children}</div>
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {children}
+        {onReset && (
+          <button
+            onClick={onReset}
+            disabled={resetting}
+            title="Resetear contraseña"
+            className="btn-ghost text-[11px] px-2.5 py-1 inline-flex items-center gap-1 text-accent"
+          >
+            <KeyRound size={12} /> Pass
+          </button>
+        )}
+      </div>
     </div>
+  )
+}
+
+function ResetPasswordModal({ name, password, onClose }: { name: string; password: string; onClose: () => void }) {
+  return (
+    <Modal open onClose={onClose} title="Contraseña reseteada">
+      <div className="space-y-4">
+        <p className="text-sm text-text-secondary">
+          Contraseña temporal para <strong className="text-text-primary">{name}</strong>.
+          Pasásela por un medio seguro: al ingresar, la app le va a pedir que cree una nueva.
+        </p>
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-base bg-surface-2 px-3 py-2.5 rounded-lg font-mono tracking-widest text-text-primary text-center select-all">
+            {password}
+          </code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(password); toast.success('Copiada') }}
+            className="btn-ghost px-2.5 py-2.5 inline-flex items-center gap-1"
+          >
+            <Copy size={14} />
+          </button>
+        </div>
+        <p className="text-[11px] text-text-muted">
+          Esta contraseña no se vuelve a mostrar. Si la perdés, reseteala de nuevo.
+        </p>
+        <button onClick={onClose} className="btn-primary w-full">Entendido</button>
+      </div>
+    </Modal>
   )
 }
 

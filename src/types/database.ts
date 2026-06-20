@@ -145,6 +145,7 @@ export interface Profile {
   is_admin: boolean
   is_loader: boolean  // puede cargar resultados, sin acceso al resto del admin
   is_super_admin?: boolean // v2: acceso total a la plataforma (ausente en datos v1)
+  must_change_password?: boolean // v2: si true, el login obliga a setear nueva pass
   created_at: string
 }
 

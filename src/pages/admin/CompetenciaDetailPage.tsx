@@ -7,7 +7,7 @@ import {
 import { toast } from 'sonner'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchCompetition, cloneCompetition } from '../../services/v2/adminService'
+import { fetchCompetition, cloneCompetition, createPublicoTenComp } from '../../services/v2/adminService'
 import { fetchTeamsByCompetition } from '../../services/v2/teamService'
 import type { TeamWithGroup } from '../../services/teamService'
 import { Modal } from '../../components/ui/Modal'
@@ -245,10 +245,27 @@ export function CompetenciaDetailPage() {
   })
 
   const { mutate: doClone, isPending: cloning } = useMutation({
-    mutationFn: (args: CloneArgs) => cloneCompetition(id, args),
-    onSuccess: (newComp) => {
+    mutationFn: async (args: CloneArgs) => {
+      const newComp = await cloneCompetition(id, args)
+      // Al clonar, siempre crear una penca pública en el tenant "Publico".
+      // Si falla, no se revierte la competencia ya creada: se avisa.
+      let publicoSlug: string | null = null
+      let publicoError: string | null = null
+      try {
+        const r = await createPublicoTenComp(newComp)
+        publicoSlug = r?.slug ?? null
+        if (!r) publicoError = 'no se encontró el tenant Publico'
+      } catch (e) {
+        publicoError = (e as Error).message
+      }
+      return { newComp, publicoSlug, publicoError }
+    },
+    onSuccess: ({ newComp, publicoSlug, publicoError }) => {
       toast.success(`Competencia "${newComp.name}" creada`)
+      if (publicoSlug) toast.success(`Penca pública creada en Publico: /p/${publicoSlug}`)
+      else if (publicoError) toast.error(`Competencia creada, pero no se creó la penca en Publico: ${publicoError}`)
       qc.invalidateQueries({ queryKey: ['v2', 'competitions'] })
+      qc.invalidateQueries({ queryKey: ['v2', 'tenant-ten-comps'] })
       setCloneOpen(false)
       navigate(`/admin/competencias/${newComp.id}`)
     },

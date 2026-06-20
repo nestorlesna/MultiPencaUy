@@ -297,6 +297,46 @@ export async function createTenComp(input: CreateTenCompInput): Promise<{
   return data as { ten_comp_id: string; slug: string; join_code: string | null }
 }
 
+const PUBLICO_TENANT_SLUG = 'publico'
+
+function slugify(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 46) || 'penca'
+}
+
+// El slug del Ten-Comp es UNIQUE global: busca el primero libre a partir de `base`.
+async function findFreeTenCompSlug(base: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('ten_comps').select('slug').ilike('slug', `${base}%`)
+  if (error) throw error
+  const taken = new Set((data ?? []).map((r: { slug: string }) => r.slug))
+  if (!taken.has(base)) return base
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base}-${i}`
+    if (!taken.has(candidate)) return candidate
+  }
+  return `${base}-${Date.now()}`
+}
+
+// Crea una penca pública en el tenant "Publico" para una competencia (típicamente
+// recién clonada). Devuelve null si el tenant Publico no existe (sin romper el flujo).
+export async function createPublicoTenComp(
+  competition: Competition
+): Promise<{ slug: string } | null> {
+  const publico = await fetchTenantBySlug(PUBLICO_TENANT_SLUG)
+  if (!publico) return null
+  const slug = await findFreeTenCompSlug(slugify(competition.name))
+  const res = await createTenComp({
+    tenantId: publico.id,
+    competitionId: competition.id,
+    name: competition.name,
+    slug,
+    visibility: 'public',
+    bonusEnabled: false,
+  })
+  return { slug: res.slug }
+}
+
 // Edición directa del Ten-Comp (RLS: is_tenant_admin). Menú, status, visibilidad, nombre.
 export async function updateTenComp(
   id: string,
@@ -350,6 +390,26 @@ export async function approveMember(tenCompId: string, userId: string): Promise<
     p_user: userId,
   })
   if (error) throw error
+}
+
+// Resetea la contraseña de un miembro vía endpoint serverless (service role).
+// Devuelve la pass temporal autogenerada; el usuario debe cambiarla en el próximo login.
+export async function resetUserPassword(userId: string): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('Sin sesión')
+  const res = await fetch('/api/admin-reset-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ user_id: userId }),
+  })
+  const json = await res.json() as { success?: boolean; password?: string; error?: string }
+  if (!res.ok || !json.success || !json.password) {
+    throw new Error(json.error ?? 'No se pudo resetear la contraseña')
+  }
+  return json.password
 }
 
 // Cambiar estado (bloquear / re-habilitar) — RLS permite al admin del Ten-Comp.
