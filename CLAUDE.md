@@ -170,7 +170,8 @@ export const supabase = createClient(
 - `is_super_admin` en profiles para acceso a toda la plataforma
 - RLS usa funciones helper `SECURITY DEFINER`: `is_super_admin()`, `is_tenant_admin(tenant_id)`, `is_tenant_loader(tenant_id)`, `is_approved_member(ten_comp_id)`
 - Lock de predicciones: RLS usa `now()` del servidor — inmune a manipulación de reloj
-- **Reseteo de contraseña por admin:** endpoint `api/admin-reset-password.ts` (service role) setea una pass temporal autogenerada vía `auth.admin.updateUserById` y prende `profiles.must_change_password`. Autoriza a super-admin o al admin de un tenant donde el target es miembro. Botón "Pass" en el tab Miembros (`PencaAdminPage` → `resetUserPassword`). El gate en `Layout` bloquea la app con `ForcePasswordChange` mientras `must_change_password = true`; al setear la nueva pass el dueño apaga el flag (permitido por `profiles_update_own`). Migración `97`.
+- **Reseteo de contraseña por admin:** endpoint `api/admin-reset-password.ts` (service role) setea una pass temporal autogenerada vía `auth.admin.updateUserById` y prende `profiles.must_change_password`. Autoriza a super-admin o al admin de un tenant donde el target es miembro. Botón "Pass" en el tab Miembros (`PencaAdminPage`) y en `/admin/usuarios` (super-admin), ambos vía `resetUserPassword` + `ResetPasswordModal` (componente compartido). El gate en `Layout` bloquea la app con `ForcePasswordChange` mientras `must_change_password = true`; al setear la nueva pass el dueño apaga el flag (permitido por `profiles_update_own`). Migración `97`.
+- **Emails de usuarios (super-admin):** `/admin/usuarios` muestra el email vía RPC global `admin_get_all_user_emails()` (guardado por `is_super_admin()`, lee `auth.users`) → `fetchAllUserEmails`. Migración `98`. (El RPC `admin_get_user_details(p_ten_comp)` es por-penca; este es la lista completa de la plataforma.)
 
 ### Tablas principales v2
 

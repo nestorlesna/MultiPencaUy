@@ -392,6 +392,13 @@ export async function approveMember(tenCompId: string, userId: string): Promise<
   if (error) throw error
 }
 
+// Emails de todos los usuarios (solo super-admin) — RPC global guardado por is_super_admin().
+export async function fetchAllUserEmails(): Promise<{ id: string; email: string }[]> {
+  const { data, error } = await supabase.rpc('admin_get_all_user_emails')
+  if (error) throw error
+  return (data ?? []) as { id: string; email: string }[]
+}
+
 // Resetea la contraseña de un miembro vía endpoint serverless (service role).
 // Devuelve la pass temporal autogenerada; el usuario debe cambiarla en el próximo login.
 export async function resetUserPassword(userId: string): Promise<string> {
@@ -405,7 +412,17 @@ export async function resetUserPassword(userId: string): Promise<string> {
     },
     body: JSON.stringify({ user_id: userId }),
   })
-  const json = await res.json() as { success?: boolean; password?: string; error?: string }
+  // En `vite dev` las funciones de /api no corren → 404 con cuerpo vacío.
+  // Solo están disponibles en Vercel (o con `vercel dev`).
+  if (res.status === 404) {
+    throw new Error('El endpoint /api no está disponible en este entorno (las funciones serverless solo corren en el servidor / `vercel dev`, no en `vite dev`).')
+  }
+  let json: { success?: boolean; password?: string; error?: string } = {}
+  try {
+    json = await res.json()
+  } catch {
+    throw new Error(`Respuesta inválida del servidor (HTTP ${res.status}).`)
+  }
   if (!res.ok || !json.success || !json.password) {
     throw new Error(json.error ?? 'No se pudo resetear la contraseña')
   }

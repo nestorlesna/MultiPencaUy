@@ -102,8 +102,15 @@ export async function sendEmailViaApi(
     },
     body: JSON.stringify({ email_id: emailId }),
   })
-  const json = await res.json()
-  return json as { success: boolean; error?: string }
+  // En `vite dev` las funciones de /api no corren → 404 con cuerpo vacío.
+  if (res.status === 404) {
+    return { success: false, error: 'El endpoint /api no está disponible en este entorno (solo corre en el servidor / `vercel dev`).' }
+  }
+  try {
+    return await res.json() as { success: boolean; error?: string }
+  } catch {
+    return { success: false, error: `Respuesta inválida del servidor (HTTP ${res.status}).` }
+  }
 }
 
 // ── Datos de miembros (RPCs v2 ten-comp-scoped, guardadas por is_ten_comp_admin) ──

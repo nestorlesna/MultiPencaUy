@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, ShieldCheck, ShieldOff, UserCheck, UserX, Search, ClipboardList } from 'lucide-react'
+import { Loader2, ShieldCheck, ShieldOff, UserCheck, UserX, Search, ClipboardList, KeyRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
-import { fetchAllProfiles, fetchAdminUserDetails, setUserActive, setUserAdmin, setUserLoader } from '../../services/profileService'
-import { fetchMatchCount } from '../../services/matchService'
-import type { AdminUserDetail } from '../../services/profileService'
+import { fetchAllProfiles, setUserActive, setUserAdmin, setUserLoader } from '../../services/profileService'
+import { fetchAllUserEmails, resetUserPassword } from '../../services/v2/adminService'
+import { ResetPasswordModal } from '../../components/admin/ResetPasswordModal'
 import { useAuth } from '../../hooks/useAuth'
 import type { Profile } from '../../types'
 
@@ -27,19 +27,24 @@ function UsuariosContent() {
     queryFn: fetchAllProfiles,
   })
 
-  const { data: userDetails } = useQuery({
-    queryKey: ['admin_user_details'],
-    queryFn: fetchAdminUserDetails,
+  const { data: emails } = useQuery({
+    queryKey: ['admin_all_user_emails'],
+    queryFn: fetchAllUserEmails,
   })
 
-  const { data: totalMatches } = useQuery({
-    queryKey: ['match_count'],
-    queryFn: fetchMatchCount,
-  })
+  const emailMap = new Map<string, string>((emails ?? []).map(e => [e.id, e.email]))
 
-  const detailsMap = new Map<string, AdminUserDetail>(
-    (userDetails ?? []).map(d => [d.id, d])
-  )
+  const [resetInfo, setResetInfo] = useState<{ name: string; password: string } | null>(null)
+  const resetMut = useMutation({
+    mutationFn: (p: Profile) => resetUserPassword(p.id),
+    onSuccess: (password, p) =>
+      setResetInfo({ name: p.display_name || p.username || 'Usuario', password }),
+    onError: (e: Error) => toast.error(e.message),
+  })
+  const onReset = (p: Profile) => {
+    if (confirm(`¿Resetear la contraseña de ${p.display_name || p.username}? Tendrá que cambiarla en el próximo ingreso.`))
+      resetMut.mutate(p)
+  }
 
   const mutateActive = useMutation({
     mutationFn: ({ id, val }: { id: string; val: boolean }) => setUserActive(id, val),
@@ -108,9 +113,10 @@ function UsuariosContent() {
             <UserRow
               key={profile.id}
               profile={profile}
-              detail={detailsMap.get(profile.id)}
-              totalMatches={totalMatches ?? 0}
+              email={emailMap.get(profile.id)}
               isMe={profile.id === me?.id}
+              resetting={resetMut.isPending}
+              onReset={() => onReset(profile)}
               onToggleActive={(val) => {
                 mutateActive.mutate({ id: profile.id, val })
                 toast.success(val ? `${profile.username} activado` : `${profile.username} desactivado`)
@@ -127,23 +133,27 @@ function UsuariosContent() {
           ))}
         </div>
       )}
+
+      {resetInfo && (
+        <ResetPasswordModal name={resetInfo.name} password={resetInfo.password} onClose={() => setResetInfo(null)} />
+      )}
     </div>
   )
 }
 
 interface UserRowProps {
   profile: Profile
-  detail?: AdminUserDetail
-  totalMatches: number
+  email?: string
   isMe: boolean
+  resetting: boolean
+  onReset: () => void
   onToggleActive: (val: boolean) => void
   onToggleAdmin: (val: boolean) => void
   onToggleLoader: (val: boolean) => void
 }
 
-function UserRow({ profile, detail, totalMatches, isMe, onToggleActive, onToggleAdmin, onToggleLoader }: UserRowProps) {
+function UserRow({ profile, email, isMe, resetting, onReset, onToggleActive, onToggleAdmin, onToggleLoader }: UserRowProps) {
   const initials = (profile.display_name || profile.username)[0].toUpperCase()
-  const noPredictions = detail !== undefined && detail.predictions_count === 0
 
   return (
     <div className="card p-4 flex items-center gap-3">
@@ -165,18 +175,8 @@ function UserRow({ profile, detail, totalMatches, isMe, onToggleActive, onToggle
           {profile.is_loader && !profile.is_admin && <span className="badge bg-primary/20 text-primary text-[10px]">Cargador</span>}
         </div>
         <p className="text-xs text-text-muted">@{profile.username}</p>
-        {detail && (
-          <p className="text-xs text-text-muted truncate">{detail.email}</p>
-        )}
-        {detail !== undefined && (
-          <p className={`text-xs font-medium mt-0.5 ${noPredictions ? 'text-error' : 'text-text-muted'}`}>
-            {detail.predictions_count}
-            {totalMatches > 0
-              ? <span className="text-text-muted font-normal"> / {totalMatches} partidos</span>
-              : <span className="text-text-muted font-normal"> apuesta{detail.predictions_count !== 1 ? 's' : ''}</span>
-            }
-            {noPredictions && ' — sin apuestas'}
-          </p>
+        {email && (
+          <p className="text-xs text-text-muted truncate">{email}</p>
         )}
       </div>
 
@@ -187,6 +187,18 @@ function UserRow({ profile, detail, totalMatches, isMe, onToggleActive, onToggle
           : <span className="badge bg-error/20 text-error text-[10px] hidden sm:inline-flex">Inactivo</span>
         }
       </div>
+
+      {/* Reseteo de contraseña — no sobre uno mismo */}
+      {!isMe && (
+        <button
+          onClick={onReset}
+          disabled={resetting}
+          title="Resetear contraseña"
+          className="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+        >
+          <KeyRound size={16} />
+        </button>
+      )}
 
       {/* Acciones — no puede editarse a sí mismo */}
       {!isMe && (
