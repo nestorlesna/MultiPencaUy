@@ -253,7 +253,7 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 | `populate_knockout(p_competition)` | ídem | Dispatcher de motores de avance |
 | `recalculate_all(p_competition)` | super-admin | Recalcula todo |
 | `approve_member(p_ten_comp, p_user)` | tenant-admin | Aprueba miembro pendiente |
-| `clone_competition(p_id)` | super-admin | Duplica una competencia como template (útil para crear "Copa América 2028" desde 2025) |
+| `clone_competition(p_id)` | super-admin | Duplica una competencia como template (útil para crear "Copa América 2028" desde 2025). **Implementado en frontend** (`cloneCompetition` en `adminService.ts`), no como RPC: copia catálogo + `default_menu`/`default_scoring`, reagenda fechas (+7 días/jornada), opción espejo y **transformación de equipos** (mapa `old→new` con nombre/abreviatura/escudo, estructura intacta) |
 
 ---
 
@@ -386,8 +386,12 @@ Reglas que se conservan del sistema actual (ya endurecidas en `14`–`16_securit
 > Servicio `services/v2/adminService.ts` centraliza todas las operaciones admin.
 > Build OK. Accesos desde `PencasPage` (super-admin → `/admin/tenants`; tenant-admin → `/t/:slug/admin`).
 - ✅ Super-admin: CRUD tenants + asignación de admins/cargadores (`AdminTenantsPage`)
-- [ ] Super-admin: CRUD competencias (wizard: datos → fases → grupos → equipos → partidos →
-      reglas de avance → scoring/menú default) + `clone_competition` — **pendiente**
+- 🟡 Super-admin: CRUD competencias (wizard: datos → fases → grupos → equipos → partidos →
+      reglas de avance → scoring/menú default) — edición por herramienta operativa
+      (`CompetenciaDetailPage` + Equipos/Partidos); falta el wizard guiado de alta desde cero
+- ✅ `clone_competition` (frontend): clona catálogo + `default_menu`/`default_scoring`, reagenda
+      fechas, espejo y **transformación de equipos** (renombrar manteniendo la estructura).
+      Cubre el alta de ediciones nuevas a partir de un template (ej. Clausura desde Apertura)
 - ✅ Carga de resultados con selector de competencia (`AdminResultadosV2Page` + `ResultFormV2`
       vía RPC `set_match_result` + `recalculate_all`)
 - ✅ Admin tenant: CRUD Ten-Comps (`TenantAdminPage`, RPC `create_ten_comp` → copia
@@ -565,6 +569,9 @@ El Header/BottomNav filtran por esto. Las rutas también validan (un ítem ocult
 6. **App móvil:** ✅ Sin stores en v1 — web + APK directo (página /descargar), como hoy.
 7. **Límites soft:** ✅ Sí — `tenants.max_ten_comps` y `max_members_per_ten_comp` (NULL = sin
    límite), asignados por super-admin, enforcement en RPCs de creación y join.
-8. **Otras competencias / ligas largas:** ✅ v1 arranca **solo con el Mundial** (motor
-   `wc48_best_thirds`). El dispatcher de motores queda implementado; los demás motores y la UI
-   de ligas por fechas se diseñan e implementan después, competencia por competencia.
+8. **Otras competencias / ligas largas:** ✅ El dispatcher de motores queda implementado; el
+   único motor de avance es `wc48_best_thirds` (Mundial). Las **ligas por fechas ya están en
+   producción** sin motor (`advancement_engine = NULL`): se cargaron como pencas públicas bajo
+   el tenant "Publico" — **Apertura UY 2026** (tabla única, menú `posiciones`) e **Intermedio
+   UY 2026** (2 series vía `groups`, menú `grupos`). Soportan `round_number` (fechas) y se ven
+   en Fixture/Posiciones/Grupos sin tocar el schema. Nuevos motores knockout, cuando hagan falta.

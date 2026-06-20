@@ -59,3 +59,31 @@ export async function fetchUserPredictionsMapV2(
   const preds = (data ?? []) as PredictionV2[]
   return new Map(preds.map(p => [p.match_id, p]))
 }
+
+export interface PredictionSummaryV2 {
+  home_score: number
+  away_score: number
+  count: number
+}
+
+export async function fetchMatchPredictionsSummaryV2(
+  tenCompId: string,
+  matchId: string
+): Promise<{ summary: PredictionSummaryV2[]; totalPredictions: number }> {
+  const { data, error } = await supabase
+    .from('predictions')
+    .select('home_score, away_score')
+    .eq('ten_comp_id', tenCompId)
+    .eq('match_id', matchId)
+  if (error) throw error
+
+  const map = new Map<string, PredictionSummaryV2>()
+  for (const row of (data ?? []) as Array<{ home_score: number; away_score: number }>) {
+    const key = `${row.home_score}-${row.away_score}`
+    if (!map.has(key)) map.set(key, { home_score: row.home_score, away_score: row.away_score, count: 0 })
+    map.get(key)!.count++
+  }
+
+  const summary = Array.from(map.values()).sort((a, b) => b.count - a.count)
+  return { summary, totalPredictions: data?.length ?? 0 }
+}

@@ -22,7 +22,6 @@ import { AuditoriaPage } from './pages/admin/AuditoriaPage'
 import { TercerosPage } from './pages/admin/TercerosPage'
 import { PosicionesGruposPage } from './pages/admin/PosicionesGruposPage'
 import { CombinacionesPage } from './pages/admin/CombinacionesPage'
-import { CorreosPage } from './pages/admin/CorreosPage'
 import { ResultAutoPage } from './pages/admin/ResultAutoPage'
 import { BracketPage } from './pages/BracketPage'
 import { MasPuntosPage } from './pages/MasPuntosPage'
@@ -46,10 +45,12 @@ import { PencaGruposPage } from './pages/penca/PencaGruposPage'
 import { PencaGrupoDetailPage } from './pages/penca/PencaGrupoDetailPage'
 import { PencaAdminPage } from './pages/penca/PencaAdminPage'
 import { PencaCuadroPage } from './pages/penca/PencaCuadroPage'
+import { PencaPosicionesPage } from './pages/penca/PencaPosicionesPage'
 import { PencaMasPuntosPage } from './pages/penca/PencaMasPuntosPage'
 import { PencaSubgruposPage } from './pages/penca/PencaSubgruposPage'
 import { PencaSubgrupoDetailPage } from './pages/penca/PencaSubgrupoDetailPage'
 import { AdminHubPage } from './pages/admin/AdminHubPage'
+import { LimpiezaPage } from './pages/admin/LimpiezaPage'
 import { AdminTenantsPage } from './pages/admin/AdminTenantsPage'
 import { CompetenciasPage } from './pages/admin/CompetenciasPage'
 import { CompetenciaDetailPage } from './pages/admin/CompetenciaDetailPage'
@@ -97,6 +98,7 @@ function AppContent() {
               <Route path="grupos"          element={<PencaGruposPage />} />
               <Route path="grupos/:grupo"   element={<PencaGrupoDetailPage />} />
               <Route path="cuadro"          element={<PencaCuadroPage />} />
+              <Route path="posiciones"      element={<PencaPosicionesPage />} />
               <Route path="ranking"         element={<PencaRankingPage />} />
               <Route path="mis-predicciones" element={<PencaMisPrediccionesPage />} />
               <Route path="mas-puntos"      element={<PencaMasPuntosPage />} />
@@ -122,13 +124,13 @@ function AppContent() {
             <Route path="admin/competencias/:id/combinaciones"     element={<CombinacionesPage />} />
             <Route path="admin/competencias/:id/resultauto"        element={<ResultAutoPage />} />
             <Route path="admin/resultados-v2" element={<AdminResultadosV2Page />} />
+            <Route path="admin/limpieza"      element={<LimpiezaPage />} />
 
             {/* Admin */}
             <Route path="admin/usuarios"    element={<UsuariosPage />} />
             <Route path="admin/resultados"  element={<ResultadosPage />} />
             <Route path="admin/config"      element={<ConfigPage />} />
             <Route path="admin/auditoria"   element={<AuditoriaPage />} />
-            <Route path="admin/correos"           element={<CorreosPage />} />
             <Route path="*"                 element={<NotFoundPage />} />
           </Route>
         </Routes>

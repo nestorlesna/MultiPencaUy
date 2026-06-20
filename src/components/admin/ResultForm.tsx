@@ -5,7 +5,6 @@ import { Plus, Minus } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { TeamFlag } from '../ui/TeamFlag'
 import { setMatchResult, calculateMatchPoints } from '../../services/adminService'
-import { enqueueMatchResultEmails } from '../../services/emailService'
 import type { MatchWithRelations } from '../../types/match'
 
 interface Props {
@@ -101,32 +100,13 @@ export function ResultForm({ match, onClose }: Props) {
         awayScorePk,
       })
       const count = await calculateMatchPoints(match.id)
-      const updatedMatch = {
-        ...match,
-        status: 'finished' as const,
-        home_score_90: form.homeScore90,
-        away_score_90: form.awayScore90,
-        home_score_et: homeScoreEt,
-        away_score_et: awayScoreEt,
-        home_score_pk: homeScorePk,
-        away_score_pk: awayScorePk,
-      }
-      let emailCount = 0
-      try {
-        emailCount = await enqueueMatchResultEmails(updatedMatch)
-      } catch (e) {
-        console.error('Error al encolar correos:', e)
-      }
-      return { count, emailCount }
+      return { count }
     },
     onSuccess: (result) => {
-      const count      = result?.count ?? 0
-      const emailCount = result?.emailCount ?? 0
+      const count = result?.count ?? 0
       toast.success(`Resultado guardado · ${count} predicciones calculadas`)
-      if (emailCount > 0) toast.success(`${emailCount} correos agregados a la cola`)
       qc.invalidateQueries({ queryKey: ['matches'] })
       qc.invalidateQueries({ queryKey: ['predictions'] })
-      qc.invalidateQueries({ queryKey: ['email_queue'] })
       onClose()
     },
     onError: (e: Error) => toast.error(e.message),

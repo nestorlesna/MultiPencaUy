@@ -108,23 +108,26 @@ export function MatchCard({ match, onClick, onStadiumClick, onPredictionsClick, 
         </div>
       </div>
 
-      {/* Footer: estadio (default) o contenido custom */}
-      <div className="mt-3 pt-3 border-t border-border">
-        {footerContent ?? (
-          <div
-            className="flex items-center gap-1 cursor-pointer hover:text-text-secondary transition-colors"
-            onClick={(e) => {
-              e.stopPropagation()
-              onStadiumClick?.(match.stadium.id)
-            }}
-          >
-            <MapPin size={11} className="text-text-muted flex-shrink-0" />
-            <span className="text-[11px] text-text-muted truncate">
-              {match.stadium.name} · {match.stadium.city}
-            </span>
-          </div>
-        )}
-      </div>
+      {/* Footer: estadio (default) o contenido custom. El estadio puede no estar
+          cargado (ej. ligas sin estadios) → se omite el footer por defecto. */}
+      {(footerContent || match.stadium) && (
+        <div className="mt-3 pt-3 border-t border-border">
+          {footerContent ?? (
+            <div
+              className="flex items-center gap-1 cursor-pointer hover:text-text-secondary transition-colors"
+              onClick={(e) => {
+                e.stopPropagation()
+                onStadiumClick?.(match.stadium!.id)
+              }}
+            >
+              <MapPin size={11} className="text-text-muted flex-shrink-0" />
+              <span className="text-[11px] text-text-muted truncate">
+                {match.stadium!.name} · {match.stadium!.city}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -105,12 +105,14 @@ export function EquipoPage() {
             )}
             <div className="flex items-center gap-3 mt-1">
               <span className="text-xs text-text-muted font-mono">{team.abbreviation}</span>
-              <Link
-                to={`/grupos/${team.group.name}`}
-                className="text-xs text-primary hover:underline"
-              >
-                Grupo {team.group.name}
-              </Link>
+              {team.group && (
+                <Link
+                  to={`/grupos/${team.group.name}`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Grupo {team.group.name}
+                </Link>
+              )}
             </div>
           </div>
         </div>

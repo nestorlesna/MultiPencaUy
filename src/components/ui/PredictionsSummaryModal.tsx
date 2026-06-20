@@ -23,9 +23,8 @@ export function PredictionsSummaryModal({
   summary,
   totalPredictions,
 }: Props) {
-  if (summary.length === 0) return null
 
-  const maxCount = summary[0].count
+  const maxCount = summary[0]?.count ?? 1
 
   return (
     <Modal open={open} onClose={onClose} title="Predicciones" size="md">
@@ -40,11 +39,21 @@ export function PredictionsSummaryModal({
           </div>
         )}
 
+        {/* Sin apuestas */}
+        {summary.length === 0 && (
+          <div className="flex flex-col items-center gap-2 py-6 text-text-muted">
+            <Users size={32} className="opacity-30" />
+            <p className="text-sm">Nadie apostó en este partido.</p>
+          </div>
+        )}
+
         {/* Total */}
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <Users size={14} />
-          <span>{totalPredictions} predicciones</span>
-        </div>
+        {summary.length > 0 && (
+          <div className="flex items-center gap-2 text-sm text-text-secondary">
+            <Users size={14} />
+            <span>{totalPredictions} predicciones</span>
+          </div>
+        )}
 
         {/* Lista de resultados */}
         <div className="space-y-2">

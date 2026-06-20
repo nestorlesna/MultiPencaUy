@@ -4,6 +4,10 @@ interface Props {
   standings: GroupStanding[]
   compact?: boolean
   onTeamClick?: (teamId: string) => void
+  // Resalta posiciones 1-4 (clasificación de grupo). En ligas todos-contra-todos no aplica.
+  highlightPositions?: boolean
+  // Leyenda "Clasifican directo / Posible mejor 3ro". Solo tiene sentido con grupos.
+  showLegend?: boolean
 }
 
 // Colores por posición
@@ -14,7 +18,13 @@ const positionColors: Record<number, string> = {
   4: 'border-l-2 border-l-transparent',
 }
 
-export function GroupTable({ standings, compact = false, onTeamClick }: Props) {
+export function GroupTable({
+  standings,
+  compact = false,
+  onTeamClick,
+  highlightPositions = true,
+  showLegend = true,
+}: Props) {
   if (standings.length === 0) {
     return (
       <div className="py-6 text-center text-text-muted text-sm">
@@ -49,7 +59,7 @@ export function GroupTable({ standings, compact = false, onTeamClick }: Props) {
             <tr
               key={row.team_id}
               onClick={() => onTeamClick?.(row.team_id)}
-              className={`${positionColors[row.position]} transition-colors ${
+              className={`${highlightPositions ? (positionColors[row.position] ?? '') : ''} transition-colors ${
                 onTeamClick ? 'cursor-pointer hover:bg-surface-2' : 'hover:bg-surface-2'
               }`}
             >
@@ -99,7 +109,7 @@ export function GroupTable({ standings, compact = false, onTeamClick }: Props) {
       </table>
 
       {/* Leyenda */}
-      {!compact && (
+      {!compact && showLegend && (
         <div className="flex items-center gap-4 mt-3 px-1 text-[10px] text-text-muted">
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-primary inline-block" />

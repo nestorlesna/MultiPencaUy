@@ -46,7 +46,7 @@ const MATCH_SELECT = `
 ` as const
 
 export interface TeamWithGroup extends Team {
-  group: { id: string; name: string; order: number }
+  group: { id: string; name: string; order: number } | null
 }
 
 export async function fetchTeam(id: string): Promise<TeamWithGroup | null> {

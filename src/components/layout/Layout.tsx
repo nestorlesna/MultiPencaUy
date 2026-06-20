@@ -1,10 +1,20 @@
 import { Outlet } from 'react-router-dom'
 import { ActiveTenCompProvider } from '../../contexts/TenCompContext'
+import { useAuth } from '../../hooks/useAuth'
+import { ForcePasswordChange } from '../auth/ForcePasswordChange'
 import { BottomNav } from './BottomNav'
 import { Header } from './Header'
 import { Footer } from './Footer'
 
 export function Layout() {
+  const { user, profile, loading } = useAuth()
+
+  // Gate: si un admin reseteó la pass, el usuario debe crear una nueva antes de
+  // poder usar la app (cualquier ruta).
+  if (!loading && user && profile?.must_change_password) {
+    return <ForcePasswordChange userId={user.id} />
+  }
+
   return (
     <ActiveTenCompProvider>
       <div className="min-h-screen bg-background text-text-primary flex flex-col">

@@ -2,17 +2,36 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { MatchCard } from '../../components/matches/MatchCard'
+import { MatchSummaryModal } from '../../components/ui/MatchSummaryModal'
 import { useTenComp } from '../../contexts/TenCompContext'
-import { fetchMatches, fetchPhases, fetchGroups } from '../../services/v2/matchService'
+import { fetchMatches, fetchPhases, fetchGroups, fetchRounds } from '../../services/v2/matchService'
+import { fetchMatchPredictionsSummaryV2 } from '../../services/v2/predictionService'
 import { matchDateKey, formatMatchDayFull } from '../../utils/datetime'
+import type { MatchWithRelations } from '../../types/match'
+import type { PredictionSummaryV2 } from '../../services/v2/predictionService'
 
-// Fixture read-only scoped a la competencia del Ten-Comp. Las predicciones y
-// los modales (estadio/apuestas) se cablean en el siguiente incremento de Fase 3.
 export function PencaFixturePage() {
-  const { competition } = useTenComp()
+  const { competition, tenComp } = useTenComp()
   const compId = competition.id
+  const tenCompId = tenComp.id
   const [phaseOrder, setPhaseOrder] = useState<number | undefined>(undefined)
   const [groupName, setGroupName] = useState<string | undefined>(undefined)
+  const [roundNumber, setRoundNumber] = useState<number | undefined>(undefined)
+  const [summaryMatch, setSummaryMatch] = useState<MatchWithRelations | null>(null)
+  const [summaryData, setSummaryData] = useState<{ summary: PredictionSummaryV2[]; totalPredictions: number } | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
+
+  const handleViewSummary = async (matchId: string, match: MatchWithRelations) => {
+    setSummaryMatch(match)
+    setSummaryLoading(true)
+    setSummaryData(null)
+    try {
+      const data = await fetchMatchPredictionsSummaryV2(tenCompId, matchId)
+      setSummaryData(data)
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
 
   const { data: phases = [] } = useQuery({
     queryKey: ['v2', 'phases', compId],
@@ -24,14 +43,22 @@ export function PencaFixturePage() {
     queryFn: () => fetchGroups(compId),
     staleTime: 1000 * 60 * 10,
   })
+  const { data: rounds = [] } = useQuery({
+    queryKey: ['v2', 'rounds', compId],
+    queryFn: () => fetchRounds(compId),
+    staleTime: 1000 * 60 * 10,
+  })
   const { data: matches, isLoading, error } = useQuery({
-    queryKey: ['v2', 'matches', compId, phaseOrder, groupName],
-    queryFn: () => fetchMatches(compId, { phaseOrder, groupName }),
+    queryKey: ['v2', 'matches', compId, phaseOrder, groupName, roundNumber],
+    queryFn: () => fetchMatches(compId, { phaseOrder, groupName, roundNumber }),
   })
 
-  // El grupo se filtra solo en fase de grupos (la de sort_order = 1) o en "Todos".
+  // Competencias tipo liga: usan round_number en vez de fases/grupos
+  const isLeague = rounds.length > 0
+
+  // Para torneos con fases/grupos (Mundial): el filtro de grupo aplica solo en la fase de grupos
   const groupPhaseOrder = phases[0]?.order
-  const showGroupFilter = groups.length > 0 && (phaseOrder === groupPhaseOrder || phaseOrder === undefined)
+  const showGroupFilter = !isLeague && groups.length > 0 && (phaseOrder === groupPhaseOrder || phaseOrder === undefined)
 
   const groupedByDate = useMemo(() => {
     if (!matches) return []
@@ -52,23 +79,44 @@ export function PencaFixturePage() {
     <div>
       <h1 className="text-xl font-bold text-text-primary mb-4">Fixture</h1>
 
-      {/* Tabs de fase (dinámicas según la competencia) */}
-      <div className="flex gap-1 overflow-x-auto pb-1 mb-3 scrollbar-hide -mx-4 px-4">
-        <PhaseTab label="Todos" active={phaseOrder === undefined} onClick={() => { setPhaseOrder(undefined); setGroupName(undefined) }} />
-        {phases.map(ph => (
-          <PhaseTab
-            key={ph.id}
-            label={ph.name}
-            active={phaseOrder === ph.order}
-            onClick={() => {
-              setPhaseOrder(ph.order)
-              if (ph.order !== groupPhaseOrder) setGroupName(undefined)
-            }}
+      {/* Liga: selector de fechas */}
+      {isLeague && (
+        <div className="flex gap-1 overflow-x-auto pb-1 mb-4 scrollbar-hide -mx-4 px-4">
+          <FilterChip
+            label="Todas"
+            active={roundNumber === undefined}
+            onClick={() => setRoundNumber(undefined)}
           />
-        ))}
-      </div>
+          {rounds.map(r => (
+            <FilterChip
+              key={r}
+              label={`F${r}`}
+              active={roundNumber === r}
+              onClick={() => setRoundNumber(roundNumber === r ? undefined : r)}
+            />
+          ))}
+        </div>
+      )}
 
-      {/* Filtro de grupo */}
+      {/* Torneo (Mundial, etc.): tabs de fase */}
+      {!isLeague && (
+        <div className="flex gap-1 overflow-x-auto pb-1 mb-3 scrollbar-hide -mx-4 px-4">
+          <PhaseTab label="Todos" active={phaseOrder === undefined} onClick={() => { setPhaseOrder(undefined); setGroupName(undefined) }} />
+          {phases.map(ph => (
+            <PhaseTab
+              key={ph.id}
+              label={ph.name}
+              active={phaseOrder === ph.order}
+              onClick={() => {
+                setPhaseOrder(ph.order)
+                if (ph.order !== groupPhaseOrder) setGroupName(undefined)
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Torneo: filtro de grupo */}
       {showGroupFilter && (
         <div className="flex gap-1 overflow-x-auto pb-1 mb-4 scrollbar-hide -mx-4 px-4">
           <button
@@ -114,12 +162,27 @@ export function PencaFixturePage() {
                 {label}
               </h2>
               <div className="space-y-3">
-                {dayMatches.map(match => <MatchCard key={match.id} match={match} />)}
+                {dayMatches.map(match => (
+                  <MatchCard
+                    key={match.id}
+                    match={match}
+                    onPredictionsClick={(matchId) => handleViewSummary(matchId, match)}
+                  />
+                ))}
               </div>
             </section>
           ))}
         </div>
       )}
+
+      <MatchSummaryModal
+        open={summaryMatch !== null}
+        onClose={() => { setSummaryMatch(null); setSummaryData(null) }}
+        match={summaryMatch}
+        loading={summaryLoading}
+        summary={summaryData?.summary ?? []}
+        totalPredictions={summaryData?.totalPredictions ?? 0}
+      />
     </div>
   )
 }
@@ -130,6 +193,19 @@ function PhaseTab({ label, active, onClick }: { label: string; active: boolean; 
       onClick={onClick}
       className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
         active ? 'bg-primary text-white' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}
+
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-shrink-0 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+        active ? 'bg-accent/20 text-accent' : 'text-text-muted hover:text-text-secondary'
       }`}
     >
       {label}

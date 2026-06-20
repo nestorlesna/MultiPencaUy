@@ -23,12 +23,13 @@ export interface MatchWithRelations {
   home_score_pk: number | null
   away_score_pk: number | null
   winner_team_id: string | null
+  round_number: number | null
   phase: {
     id: string; name: string; order: number
     has_extra_time: boolean; has_penalties: boolean
   }
   group: { id: string; name: string } | null
-  stadium: { id: string; name: string; city: string; country: string; timezone: string }
+  stadium: { id: string; name: string; city: string; country: string; timezone: string } | null
   home_team: TeamInfo | null
   away_team: TeamInfo | null
 }

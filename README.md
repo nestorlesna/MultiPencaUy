@@ -45,13 +45,18 @@ src/
 
 supabase/
 ├── legacy/         # Schema v1 (PencaLes 2026) — solo referencia para migración
-├── migrations/     # Nuevas migraciones v2 (multi-tenant)
+├── migrations/     # Nuevas migraciones v2 (multi-tenant) + seeds de competencias públicas
 └── email-templates/ # Plantillas HTML de email (Auth)
 
 docs/
-├── PLAN_MULTITENANT.md   # Plan de desarrollo y migración v2
-└── descarga_apk.md       # Flujo de distribución APK
+├── PLAN_MULTITENANT.md     # Plan de desarrollo y migración v2
+├── MIGRACION_V1_A_V2.md    # Guía paso a paso del ETL v1 → v2
+└── descarga_apk.md         # Flujo de distribución APK
 ```
+
+> Las migraciones `9x_seed_*.sql` cargan competencias públicas de ejemplo bajo el tenant
+> **"Publico"** (Apertura UY 2026 — liga de tabla única; Intermedio UY 2026 — liga por
+> series). Son idempotentes (`ON CONFLICT DO NOTHING`) y se aplican desde el SQL Editor.
 
 ## Variables de entorno
 

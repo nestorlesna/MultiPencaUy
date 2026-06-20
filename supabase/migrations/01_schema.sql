@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS stadiums (
 
 CREATE TABLE IF NOT EXISTS teams (
   id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-  competition_id   UUID         NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+  competition_id   UUID         REFERENCES competitions(id) ON DELETE SET NULL,
   name             VARCHAR(100) NOT NULL,
   abbreviation     CHAR(3)      NOT NULL,
   flag_url         VARCHAR(255),
@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS matches (
   home_score_pk    SMALLINT CHECK (home_score_pk >= 0),
   away_score_pk    SMALLINT CHECK (away_score_pk >= 0),
   winner_team_id   UUID     REFERENCES teams(id),
+  round_number     SMALLINT,                              -- fecha/jornada en ligas; NULL en torneos sin fases de liga
   UNIQUE (competition_id, match_number)
 );
 CREATE INDEX IF NOT EXISTS idx_matches_competition ON matches(competition_id);
@@ -172,6 +173,7 @@ CREATE INDEX IF NOT EXISTS idx_matches_datetime    ON matches(competition_id, ma
 CREATE INDEX IF NOT EXISTS idx_matches_phase       ON matches(phase_id);
 CREATE INDEX IF NOT EXISTS idx_matches_group       ON matches(group_id);
 CREATE INDEX IF NOT EXISTS idx_matches_status      ON matches(status);
+CREATE INDEX IF NOT EXISTS idx_matches_round       ON matches(competition_id, round_number) WHERE round_number IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS knockout_slot_rules (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

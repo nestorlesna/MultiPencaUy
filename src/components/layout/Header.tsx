@@ -54,11 +54,6 @@ export function Header() {
                   {item.label}
                 </DeskNavLink>
               ))}
-            {base && data?.isTenCompAdmin && (
-              <DeskNavLink to={`${base}/admin`}>
-                <ShieldCheck size={14} className="inline mr-1 text-accent" />Admin
-              </DeskNavLink>
-            )}
           </nav>
 
           {/* Derecha: usuario o botón ingresar */}
@@ -94,6 +89,11 @@ export function Header() {
                     <Link to="/pencas" className="block px-4 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-surface-2 transition-colors">
                       Mis pencas
                     </Link>
+                    {base && data?.isTenCompAdmin && (
+                      <Link to={`${base}/admin`} className="block px-4 py-2 text-sm text-accent hover:bg-surface-2 transition-colors flex items-center gap-2">
+                        <ShieldCheck size={14} /> Admin de la penca
+                      </Link>
+                    )}
                     {(isSuperAdmin || isAdmin || isLoader) && (
                       <Link to="/admin" className="block px-4 py-2 text-sm text-accent hover:bg-surface-2 transition-colors flex items-center gap-2">
                         <ShieldCheck size={14} /> Administración
@@ -144,9 +144,6 @@ export function Header() {
                   {item.label}
                 </MobileNavLink>
               ))}
-            {base && data?.isTenCompAdmin && (
-              <MobileNavLink to={`${base}/admin`}>Admin de la penca</MobileNavLink>
-            )}
             <MobileNavLink to="/pencas">Mis pencas</MobileNavLink>
             {user && <MobileNavLink to="/perfil">Mi perfil</MobileNavLink>}
             {user && <MobileNavLink to="/descargar">Descargar app</MobileNavLink>}

@@ -82,6 +82,7 @@ Font: Inter. UI y rutas en español.
 ### Estructura de directorios
 
 ```
+api/                      # Vercel serverless (Node) — send-email.ts (SMTP global), admin-reset-password.ts, feeds deportivos
 src/
 ├── main.tsx
 ├── App.tsx               # BrowserRouter + Routes
@@ -89,7 +90,7 @@ src/
 ├── components/
 │   ├── ui/               # Modal, Badge, Button, Input, TeamFlag, etc.
 │   ├── layout/           # Layout.tsx, BottomNav.tsx, Header.tsx
-│   ├── admin/            # ResultForm
+│   ├── admin/            # ResultFormV2, CorreosTab (panel de correos por penca)
 │   ├── groups/           # GroupTable
 │   └── matches/          # MatchCard, PredictionModal
 ├── hooks/                # useAuth, useTenComp (contexto activo), useMatches, etc.
@@ -106,6 +107,7 @@ src/
 │   ├── AuthPage.tsx / PerfilPage.tsx / NotFoundPage.tsx
 │   └── admin/            # ResultadosPage, PartidosAdminPage, etc.
 ├── services/             # Funciones de query Supabase (no hooks)
+│   ├── v2/               # Servicios multi-tenant: adminService, emailService, matchService, leaderboardService, ...
 │   ├── matchService.ts
 │   ├── predictionService.ts
 │   ├── bonusService.ts
@@ -168,6 +170,8 @@ export const supabase = createClient(
 - `is_super_admin` en profiles para acceso a toda la plataforma
 - RLS usa funciones helper `SECURITY DEFINER`: `is_super_admin()`, `is_tenant_admin(tenant_id)`, `is_tenant_loader(tenant_id)`, `is_approved_member(ten_comp_id)`
 - Lock de predicciones: RLS usa `now()` del servidor — inmune a manipulación de reloj
+- **Reseteo de contraseña por admin:** endpoint `api/admin-reset-password.ts` (service role) setea una pass temporal autogenerada vía `auth.admin.updateUserById` y prende `profiles.must_change_password`. Autoriza a super-admin o al admin de un tenant donde el target es miembro. Botón "Pass" en el tab Miembros (`PencaAdminPage`) y en `/admin/usuarios` (super-admin), ambos vía `resetUserPassword` + `ResetPasswordModal` (componente compartido). El gate en `Layout` bloquea la app con `ForcePasswordChange` mientras `must_change_password = true`; al setear la nueva pass el dueño apaga el flag (permitido por `profiles_update_own`). Migración `97`.
+- **Emails de usuarios (super-admin):** `/admin/usuarios` muestra el email vía RPC global `admin_get_all_user_emails()` (guardado por `is_super_admin()`, lee `auth.users`) → `fetchAllUserEmails`. Migración `98`. (El RPC `admin_get_user_details(p_ten_comp)` es por-penca; este es la lista completa de la plataforma.)
 
 ### Tablas principales v2
 
@@ -206,6 +210,28 @@ Todos los servicios en `src/services/` reciben scope **explícito** como paráme
 
 Los cruces knockout se calculan via un dispatcher SQL que llama a la función configurada en `competitions.advancement_engine`. En v1 solo existe `wc48_best_thirds` (Mundial 48 equipos + mejores terceros, port de los scripts legacy). El dispatcher queda implementado para agregar motores sin tocar el resto del sistema.
 
+### Formatos de competencia soportados
+
+El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia es la configuración:
+
+| Formato | `advancement_engine` | Fases | Grupos | `round_number` | Tablas de posiciones |
+|---------|----------------------|-------|--------|----------------|----------------------|
+| Grupos + eliminatoria (Mundial) | `wc48_best_thirds` | varias | sí (A–L) | no | `group_standings` por grupo + cuadro |
+| Liga de tabla única (Apertura UY) | `NULL` | 1 ("Fase Regular") | no | sí (fechas) | tabla única vía `leagueStandingsService`, menú `posiciones` |
+| Liga por series (Intermedio UY) | `NULL` | 1 ("Fase Regular") | sí (una por serie) | sí (fechas) | una `group_standings` por serie, menú `grupos` |
+
+- **Intermedio UY 2026** (seed `supabase/migrations/95_seed_intermedio_uy_2026.sql`; Apertura es la `91`): 16 equipos en 2 series (grupos `A`/`B`), todos contra todos **dentro** de cada serie, 7 fechas, sin final. Cada serie lleva su propia tabla vía `group_standings` (desempate PTS→DG→GF). Como `groups.name` es `VARCHAR(4)`, las series se nombran `A`/`B` y la UI las muestra como "Grupo A/B".
+- **Eliminatoria Sudamericana 2026** (seed `supabase/migrations/96_seed_eliminatoria_sudamericana_2026.sql`): liga de tabla única (como Apertura). 10 selecciones CONMEBOL, todos contra todos ida y vuelta = 18 fechas / 90 partidos que suman a una sola tabla (sin dividir 1ra/2da rueda). `round_number` = fecha; cargada con resultados reales (status `finished`).
+- **Admin de partidos** (`PartidosAdminPage`): además del filtro de fase ofrece filtro por grupo (Mundial/Intermedio) y por fecha (Apertura/Intermedio/Eliminatoria); cada uno aparece solo si la competencia tiene esos datos. El filtro de fecha se envuelve en varias filas (`flex-wrap`) para competencias con muchas fechas.
+
+### Clonado de competencias (con transformación de equipos)
+
+`clone_competition` está implementado en **frontend** como `cloneCompetition` (`src/services/v2/adminService.ts`), no como RPC. Duplica una competencia como template en estado `draft`:
+- Copia fases, grupos, estadios, equipos, partidos (sin resultados, `scheduled`), `knockout_slot_rules`, `combinaciones`, `competition_bonus_types` y los defaults `default_menu` / `default_scoring`.
+- Reagenda fechas: jornada 1 = `startDate`, cada jornada siguiente +7 días (usa `round_number`; sin él agrupa por fecha original). Opción `mirror` invierte local/visitante.
+- **Transformación de equipos:** un mapa opcional `old_team_id → { name, abbreviation, flag_url }` renombra cada equipo en la copia manteniendo intacta la estructura (series/grupos y fixture). El remapeo `old→new` se reconstruye por la **nueva** abreviatura, así sigue funcionando aunque se renombre todo. El modal precarga la identidad original, exige completar todas las filas y valida que las abreviaturas sean únicas.
+- **Penca en Publico automática:** al terminar el clonado se crea una penca pública (Ten-Comp) en el tenant **Publico** vía `createPublicoTenComp` (slug libre derivado del nombre, `visibility: public`, `bonus_enabled: false`). Una competencia es catálogo **global** (no pertenece a un tenant); lo que la asocia a una empresa es un Ten-Comp. Si falla la creación de la penca (o no existe el tenant Publico) la competencia clonada **no** se revierte: se avisa por toast. Para sumarla a otros tenants: `/t/:slug/admin` → "Nueva penca" (el selector incluye competencias en `draft`).
+
 ### Flujo de cálculo de puntos
 
 1. Cargador (admin/loader de tenant) carga resultado → RPC `set_match_result(competition_id, match_id, ...)`
@@ -220,6 +246,16 @@ En v2 la columna se renombró a `sort_order` para evitar el conflicto con el par
 ### Bonus por Ten-Comp
 
 Los tipos de bonus (podio, empates, rango de goles, etc.) se definen por competencia en `competition_bonus_types`. Al crear un Ten-Comp se copian a `bonus_config` si `bonus_enabled = true`. El tenant-admin puede editar los puntos pero no agregar tipos. Si `bonus_enabled = false`, el Ten-Comp no tiene sección de bonus.
+
+### Correos (multi-tenant)
+
+**Emisor de plataforma:** un único SMTP global (env vars `SMTP_HOST/PORT/USER/PASS/SECURE/FROM_NAME`) en `api/send-email.ts` (Vercel serverless + nodemailer). No hay SMTP por-tenant; lo único que varía por penca es el **branding**: el "from name" se deriva del nombre del tenant y las URLs/textos del cuerpo salen del Ten-Comp y su competencia (sin config extra en el tenant).
+
+- **Alcance por penca:** el panel es el tab **"Correos"** en `PencaAdminPage` (`/p/:slug/admin`) — componente `src/components/admin/CorreosTab.tsx`. Lo gestiona el admin de la penca (tenant-admin incluido). Cada destinatario es un miembro **aprobado** de ese Ten-Comp.
+- **Servicio:** `src/services/v2/emailService.ts` — todo scopeado por `tenCompId`; builders de HTML parametrizados por `EmailBrand`. Usa las RPCs `admin_get_user_details(p_ten_comp)` (emails + conteo de predicciones) y `admin_get_match_predictions(p_ten_comp, p_match_id)`, ambas guardadas por `is_ten_comp_admin`.
+- **Cola `email_queue`** (en `01_schema.sql`): trae `tenant_id` + `ten_comp_id`; RLS `is_tenant_admin`. `api/send-email.ts` autoriza con super-admin **o** admin del tenant dueño del correo.
+- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Pendiente:** auto-disparo de "resultado cargado" al cargar un resultado (hoy es manual desde el tab).
 
 ### Migración de datos (post 19/07/2026)
 
