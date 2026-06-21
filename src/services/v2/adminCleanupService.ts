@@ -69,51 +69,23 @@ export async function fetchTenantsForCleanup(): Promise<TenantForCleanup[]> {
   return results
 }
 
+// Borrado transaccional vía RPC (migración 99). La RPC borra en orden seguro
+// los ten_comps (y su cascada de predicciones/bonus), partidos, equipos y la
+// competencia — todo-o-nada. Ver supabase/migrations/99_admin_cleanup.sql.
 export async function deleteCompetition(competitionId: string): Promise<void> {
-  const { error: orphanErr } = await supabase
-    .from('teams')
-    .update({ competition_id: null, group_id: null })
-    .eq('competition_id', competitionId)
-  if (orphanErr) throw orphanErr
-
-  const { error: delErr } = await supabase
-    .from('competitions')
-    .delete()
-    .eq('id', competitionId)
-  if (delErr) throw delErr
+  const { error } = await supabase.rpc('admin_delete_competition', {
+    p_competition_id: competitionId,
+  })
+  if (error) throw error
 }
 
+// Borra el tenant y resuelve sus competencias propias (quita propiedad si otros
+// tenants las usan, o las borra por completo). Transaccional en la RPC.
 export async function deleteTenant(tenantId: string): Promise<void> {
   if (tenantId === PUBLIC_TENANT_ID) throw new Error('El tenant Público no se puede eliminar.')
 
-  const { data: ownedComps, error: fetchErr } = await supabase
-    .from('competitions')
-    .select('id')
-    .eq('owner_tenant_id', tenantId)
-  if (fetchErr) throw fetchErr
-
-  for (const comp of (ownedComps ?? [])) {
-    const { count, error: countErr } = await supabase
-      .from('ten_comps')
-      .select('id', { count: 'exact', head: true })
-      .eq('competition_id', comp.id)
-      .neq('tenant_id', tenantId)
-    if (countErr) throw countErr
-
-    if ((count ?? 0) > 0) {
-      const { error } = await supabase
-        .from('competitions')
-        .update({ owner_tenant_id: null })
-        .eq('id', comp.id)
-      if (error) throw error
-    } else {
-      await deleteCompetition(comp.id)
-    }
-  }
-
-  const { error: delErr } = await supabase
-    .from('tenants')
-    .delete()
-    .eq('id', tenantId)
-  if (delErr) throw delErr
+  const { error } = await supabase.rpc('admin_delete_tenant', {
+    p_tenant_id: tenantId,
+  })
+  if (error) throw error
 }

@@ -1,13 +1,16 @@
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Loader2, Star, Lock, Check } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { toast } from 'sonner'
+import { Loader2, Star, Lock, Check, Globe, KeyRound } from 'lucide-react'
 import { PredictionModal } from '../../components/predictions/PredictionModal'
 import { MatchSummaryModal } from '../../components/ui/MatchSummaryModal'
 import { TeamFlag } from '../../components/ui/TeamFlag'
 import { RequireAuth } from '../../components/auth/AuthGuard'
-import { useTenComp } from '../../contexts/TenCompContext'
+import { useTenComp, useTenCompState } from '../../contexts/TenCompContext'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchMatches, fetchPhases, fetchRounds } from '../../services/v2/matchService'
+import { joinPublicTenComp } from '../../services/tenCompService'
 import { fetchUserPredictionsMapV2, fetchMatchPredictionsSummaryV2 } from '../../services/v2/predictionService'
 import { formatMatchDay, formatMatchTime } from '../../utils/datetime'
 import type { MatchWithRelations } from '../../types/match'
@@ -24,7 +27,7 @@ export function PencaMisPrediccionesPage() {
 }
 
 function Inner() {
-  const { tenComp, competition } = useTenComp()
+  const { tenComp, competition, memberStatus } = useTenComp()
   const { user } = useAuth()
   const compId = competition.id
   const tenCompId = tenComp.id
@@ -33,9 +36,20 @@ function Inner() {
   const { data: predsMap = new Map<string, PredictionV2>() } = useQuery({
     queryKey: ['v2', 'predictions', tenCompId, user?.id],
     queryFn: () => fetchUserPredictionsMapV2(tenCompId, user!.id),
-    enabled: !!user,
+    enabled: !!user && memberStatus !== null,
     staleTime: 1000 * 60 * 2,
   })
+
+  // Predecir requiere ser miembro (pending o approved). Un no-miembro no puede
+  // apostar: la RLS rechaza el insert, así que ni mostramos el formulario.
+  if (memberStatus === null) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold text-text-primary">Mis predicciones</h1>
+        <JoinGate />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -340,6 +354,59 @@ function HistorialTab({
         totalPredictions={summaryData?.totalPredictions ?? 0}
       />
     </>
+  )
+}
+
+// ─── Gate de membresía ─────────────────────────────────────────────────────────
+
+// Se muestra cuando el usuario logueado NO es miembro de la penca: no puede
+// predecir hasta unirse. Pública → se une al instante; privada → necesita código.
+function JoinGate() {
+  const { tenComp, refetch } = useTenCompState()
+  const qc = useQueryClient()
+  const isPublic = tenComp.visibility === 'public'
+
+  const joinMut = useMutation({
+    mutationFn: () => joinPublicTenComp(tenComp.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my_ten_comps'] })
+      toast.success('¡Te uniste a la penca! Ya podés predecir.')
+      refetch()
+    },
+    onError: (e: any) => toast.error(e.message || 'No se pudo unir a la penca'),
+  })
+
+  return (
+    <div className="card p-6 text-center space-y-4">
+      <div className="flex justify-center">
+        {isPublic
+          ? <Globe size={28} className="text-primary" />
+          : <KeyRound size={28} className="text-accent" />}
+      </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-text-primary">
+          Todavía no sos parte de esta penca
+        </p>
+        <p className="text-xs text-text-muted">
+          {isPublic
+            ? 'Unite para cargar tus predicciones y aparecer en el ranking.'
+            : 'Esta penca es privada. Necesitás el código de acceso para unirte.'}
+        </p>
+      </div>
+      {isPublic ? (
+        <button
+          onClick={() => joinMut.mutate()}
+          disabled={joinMut.isPending}
+          className="btn-primary text-sm inline-flex items-center gap-1.5"
+        >
+          {joinMut.isPending ? <Loader2 size={14} className="animate-spin" /> : 'Unirme a esta penca'}
+        </button>
+      ) : (
+        <Link to="/pencas" className="btn-primary text-sm inline-flex items-center gap-1.5">
+          <KeyRound size={14} /> Unirme con código
+        </Link>
+      )}
+    </div>
   )
 }
 

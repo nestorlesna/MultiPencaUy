@@ -80,23 +80,30 @@ export async function resolveEntryTenCompSlug(
   userId: string | null,
   lastSlug: string | null
 ): Promise<string | null> {
-  const [mine, publics] = await Promise.all([
+  const [mineAll, publicsAll] = await Promise.all([
     userId ? fetchMyTenComps(userId) : Promise.resolve([] as MyPenca[]),
     fetchPublicTenComps(),
   ])
 
-  // 1. Última usada, si sigue accesible (mía o pública activa).
-  if (lastSlug) {
-    const stillAccessible =
-      mine.some(p => p.tenComp.slug === lastSlug) ||
-      publics.some(p => p.tenComp.slug === lastSlug)
-    if (stillAccessible) return lastSlug
+  // Solo pencas activas (no archivadas) son candidatas para entrar.
+  // (fetchPublicTenComps ya excluye archivadas; mis pencas pueden incluirlas.)
+  const mine = mineAll.filter(p => p.tenComp.status !== 'archived')
+  const publics = publicsAll.filter(p => p.tenComp.status !== 'archived')
+
+  // 1. Si el usuario tiene pencas propias activas, SIEMPRE priorizo las suyas.
+  //    La "última usada" solo se respeta si es una de mis pencas (continuidad
+  //    real); nunca una pública que vine ojeando deslogueado, así no aterrizo
+  //    en una competencia a la que no pertenezco.
+  if (mine.length > 0) {
+    if (lastSlug && mine.some(p => p.tenComp.slug === lastSlug)) return lastSlug
+    // Mi penca activa más reciente (ya vienen ordenadas desc por created_at).
+    return mine[0].tenComp.slug
   }
 
-  // 2. Mi penca más reciente (ya vienen ordenadas desc).
-  if (mine.length > 0) return mine[0].tenComp.slug
+  // 2. Sin pencas propias: continuidad con la última pública vista, si sigue activa.
+  if (lastSlug && publics.some(p => p.tenComp.slug === lastSlug)) return lastSlug
 
-  // 3. Pública más reciente (ya vienen ordenadas desc).
+  // 3. Pública activa más reciente como vidriera.
   if (publics.length > 0) return publics[0].tenComp.slug
 
   // 4. Sin candidato.

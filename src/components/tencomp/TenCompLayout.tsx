@@ -30,7 +30,12 @@ export function TenCompLayout() {
 
   return (
     <div>
-      <MembershipBanner memberStatus={data.memberStatus} visibility={data.tenComp.visibility} />
+      <MembershipBanner
+        tenCompId={data.tenComp.id}
+        memberStatus={data.memberStatus}
+        visibility={data.tenComp.visibility}
+        competitionStatus={data.competition.status}
+      />
       <Outlet />
     </div>
   )

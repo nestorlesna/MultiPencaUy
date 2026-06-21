@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { Loader2, RefreshCw, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../hooks/useAuth'
 import { MatchCard } from '../../components/matches/MatchCard'
@@ -16,15 +16,21 @@ export function AdminResultadosV2Page() {
   const [competitionId, setCompetitionId] = useState<string>('')
   const [phaseOrder, setPhaseOrder] = useState<number>(1)
   const [groupName, setGroupName] = useState<string | undefined>(undefined)
+  const [loadFilter, setLoadFilter] = useState<'all' | 'pending' | 'loaded'>('all')
+  const [teamQuery, setTeamQuery] = useState('')
   const [selected, setSelected] = useState<MatchWithRelations | null>(null)
 
   const canLoad = isSuperAdmin || tenantRoles.length > 0
 
-  const { data: competitions = [] } = useQuery({
+  const { data: allCompetitions = [] } = useQuery({
     queryKey: ['v2', 'competitions'],
     queryFn: fetchCompetitions,
     enabled: canLoad,
   })
+
+  // Solo se cargan resultados de competencias activas (borrador/finalizada/
+  // archivada no aparecen en el combo).
+  const competitions = allCompetitions.filter(c => c.status === 'active')
 
   // Seleccionar la primera competencia por defecto.
   useEffect(() => {
@@ -65,6 +71,27 @@ export function AdminResultadosV2Page() {
   if (!canLoad) return <Navigate to="/" replace />
 
   const showGroupFilter = phaseOrder === 1 && groups.length > 0
+
+  // Filtro por estado de carga (cargado = resultado guardado / status finished)
+  // y por nombre/abreviatura de equipo (local o visitante, sin distinguir
+  // mayúsculas, por contenido: "nal" → Nacional).
+  const q = teamQuery.trim().toLowerCase()
+  const matchesTeam = (m: MatchWithRelations) => {
+    if (!q) return true
+    const fields = [
+      m.home_team?.name, m.home_team?.abbreviation,
+      m.away_team?.name, m.away_team?.abbreviation,
+    ]
+    return fields.some(f => f?.toLowerCase().includes(q))
+  }
+  const visibleMatches = matches.filter(m =>
+    (loadFilter === 'all' ? true
+      : loadFilter === 'loaded' ? m.status === 'finished'
+      : m.status !== 'finished')
+    && matchesTeam(m)
+  )
+  const pendingCount = matches.filter(m => m.status !== 'finished').length
+  const loadedCount = matches.length - pendingCount
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
@@ -137,13 +164,64 @@ export function AdminResultadosV2Page() {
         </div>
       )}
 
+      {/* Búsqueda por equipo (local o visitante) */}
+      {matches.length > 0 && (
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            type="text"
+            value={teamQuery}
+            onChange={e => setTeamQuery(e.target.value)}
+            placeholder="Buscar equipo (local o visitante)..."
+            className="input w-full pl-9 pr-9"
+          />
+          {teamQuery && (
+            <button
+              onClick={() => setTeamQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+              title="Limpiar búsqueda"
+            >
+              <X size={15} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Filtro por estado de carga */}
+      {matches.length > 0 && (
+        <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
+          {([
+            ['all', `Todos (${matches.length})`],
+            ['pending', `Pendientes (${pendingCount})`],
+            ['loaded', `Cargados (${loadedCount})`],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setLoadFilter(key)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                loadFilter === key ? 'bg-primary text-white' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {isLoading && <Spinner />}
 
       <div className="space-y-3">
         {!isLoading && matches.length === 0 && (
           <p className="text-text-muted text-sm text-center py-8">No hay partidos en esta fase.</p>
         )}
-        {matches.map(match => (
+        {!isLoading && matches.length > 0 && visibleMatches.length === 0 && (
+          <p className="text-text-muted text-sm text-center py-8">
+            {q
+              ? `No hay partidos que coincidan con "${teamQuery.trim()}".`
+              : loadFilter === 'pending' ? 'No quedan partidos pendientes en esta fase.' : 'No hay partidos cargados en esta fase.'}
+          </p>
+        )}
+        {visibleMatches.map(match => (
           <MatchCard
             key={match.id}
             match={match}

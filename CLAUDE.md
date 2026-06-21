@@ -232,12 +232,25 @@ El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia e
 - **Transformación de equipos:** un mapa opcional `old_team_id → { name, abbreviation, flag_url }` renombra cada equipo en la copia manteniendo intacta la estructura (series/grupos y fixture). El remapeo `old→new` se reconstruye por la **nueva** abreviatura, así sigue funcionando aunque se renombre todo. El modal precarga la identidad original, exige completar todas las filas y valida que las abreviaturas sean únicas.
 - **Penca en Publico automática:** al terminar el clonado se crea una penca pública (Ten-Comp) en el tenant **Publico** vía `createPublicoTenComp` (slug libre derivado del nombre, `visibility: public`, `bonus_enabled: false`). Una competencia es catálogo **global** (no pertenece a un tenant); lo que la asocia a una empresa es un Ten-Comp. Si falla la creación de la penca (o no existe el tenant Publico) la competencia clonada **no** se revierte: se avisa por toast. Para sumarla a otros tenants: `/t/:slug/admin` → "Nueva penca" (el selector incluye competencias en `draft`).
 
+### Limpieza de datos (super-admin)
+
+`/admin/limpieza` (`LimpiezaPage`) borra físicamente competencias y tenants. El borrado es **transaccional vía RPC** (migración `99_admin_cleanup.sql`, guardadas por `is_super_admin()`); el frontend `adminCleanupService.ts` solo llama `admin_delete_competition(p_competition_id)` / `admin_delete_tenant(p_tenant_id)`.
+
+- `admin_delete_competition` borra en orden seguro: `ten_comps` (cascada predicciones/bonus) → `matches` → `teams` → `competitions`. Hace falta borrar `ten_comps` primero porque `ten_comps.competition_id` es `ON DELETE RESTRICT`; y borrar `matches`/predicciones antes que `teams` porque las FKs a `teams` son `NO ACTION`. **Los equipos se eliminan, no se huerfanizan** — no se comparten entre competencias (el clonado crea filas nuevas).
+- `admin_delete_tenant`: por cada competencia propia, si otro tenant la usa quita la propiedad (`owner_tenant_id = NULL`), si no la borra entera; al final `DELETE tenants` cascada los `ten_comps` restantes y `tenant_roles`. El tenant Público no se puede borrar.
+
 ### Flujo de cálculo de puntos
 
 1. Cargador (admin/loader de tenant) carga resultado → RPC `set_match_result(competition_id, match_id, ...)`
 2. RPC `calculate_match_points(match_id)` itera **todos los Ten-Comps** de esa competencia y aplica el scoring propio de cada uno
 3. RPC `calculate_bonus_points(competition_id)` — idempotente, corre por cada Ten-Comp con `bonus_enabled = true`
 4. El resultado es un hecho deportivo compartido; los puntos son por Ten-Comp
+
+**Ligas vs eliminatorias en el scoring (migración `100`):** un partido es *knockout* (suma `knockout_exact_score_bonus` y evalúa ET/penales) **solo si la competencia tiene `advancement_engine` y el partido no es de grupo**. Antes se asumía knockout por `group_id IS NULL`, lo que rompía en ligas (Apertura) donde *todos* los partidos no tienen grupo. Por la misma razón `recalculate_all` ahora solo llama a `populate_knockout` si la competencia tiene motor de avance (sin motor lanzaba "sin motor de avance" y abortaba todo el recálculo).
+
+**Posiciones:**
+- *Liga de tabla única* (Apertura): se calcula en el frontend (`leagueStandingsService.fetchLeagueStandings`). Lista **todos** los equipos del fixture (arrancan en 0 aunque no hayan jugado), desempate PTS→DG→GF→**enfrentamiento directo**→nombre. No se persiste ni se "crea al clonar": es derivada en vivo.
+- *Series* (Intermedio): vista `group_standings` (una tabla por serie), ya lista todos los equipos en 0; desempate PTS→DG→GF→nombre (sin head-to-head).
 
 ### Known gotcha: columna `sort_order` (antes `order`)
 

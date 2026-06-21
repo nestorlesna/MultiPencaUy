@@ -19,10 +19,10 @@ export function AuthCallbackPage() {
       async function resolveWebSession() {
         if (c) {
           const { error } = await supabase.auth.exchangeCodeForSession(c)
-          if (!error) { navigate('/fixture', { replace: true }); return }
+          if (!error) { navigate('/', { replace: true }); return }
         }
         const { data: { session } } = await supabase.auth.getSession()
-        navigate(session ? '/fixture' : '/auth', { replace: true })
+        navigate(session ? '/' : '/auth', { replace: true })
       }
       resolveWebSession()
       return
@@ -62,7 +62,7 @@ export function AuthCallbackPage() {
   async function handleContinueOnWeb() {
     if (!code) { navigate('/auth', { replace: true }); return }
     const { error } = await supabase.auth.exchangeCodeForSession(code)
-    navigate(error ? '/auth' : '/fixture', { replace: true })
+    navigate(error ? '/auth' : '/', { replace: true })
   }
 
   if (!showButton) {

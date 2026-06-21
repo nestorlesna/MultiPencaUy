@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { Trophy, ChevronDown, Globe, Building2, Check, Plus, Clock } from 'lucide-react'
 import { useTenCompState } from '../../contexts/TenCompContext'
 import { useAuth } from '../../hooks/useAuth'
-import type { MyPenca } from '../../types/tenant'
 
 // Selector de competencia activa (arriba-izquierda de la barra superior).
 // Muestra el nombre de la penca activa y un combo para cambiar entre pencas.
@@ -22,21 +21,31 @@ export function CompetitionSwitcher() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Mis pencas: públicas primero, privadas agrupadas por tenant.
-  const { myPublic, privateByTenant } = useMemo(() => {
-    const myPublic = myPencas.filter(p => p.tenComp.visibility === 'public')
-    const privates = myPencas.filter(p => p.tenComp.visibility === 'private')
-    const map = new Map<string, { tenantName: string; pencas: MyPenca[] }>()
-    for (const p of privates) {
-      const key = p.tenant.id
-      if (!map.has(key)) map.set(key, { tenantName: p.tenant.name, pencas: [] })
-      map.get(key)!.pencas.push(p)
-    }
-    return { myPublic, privateByTenant: Array.from(map.values()) }
-  }, [myPencas])
+  // Solo pencas activas (no archivadas), ordenadas por creación descendente.
+  const byNewest = (a: { createdAt: string }, b: { createdAt: string }) =>
+    b.createdAt.localeCompare(a.createdAt)
 
+  const myActive = useMemo(
+    () => myPencas.filter(p => p.tenComp.status !== 'archived'),
+    [myPencas]
+  )
+  // 1º Privadas mías, 2º Públicas mías.
+  const myPrivate = useMemo(
+    () => myActive.filter(p => p.tenComp.visibility === 'private').sort(byNewest),
+    [myActive]
+  )
+  const myPublic = useMemo(
+    () => myActive.filter(p => p.tenComp.visibility === 'public').sort(byNewest),
+    [myActive]
+  )
+  // 3º Públicas activas a las que NO estoy asociado (para anónimo: todas las públicas).
   const myIds = useMemo(() => new Set(myPencas.map(p => p.tenComp.id)), [myPencas])
-  const explorablePublic = publicPencas.filter(p => !myIds.has(p.tenComp.id))
+  const otherPublic = useMemo(
+    () => publicPencas
+      .filter(p => p.tenComp.status !== 'archived' && !myIds.has(p.tenComp.id))
+      .sort(byNewest),
+    [publicPencas, myIds]
+  )
 
   const activeName = data?.tenComp.name ?? 'PencaLes'
 
@@ -58,6 +67,22 @@ export function CompetitionSwitcher() {
 
       {open && (
         <div className="absolute left-0 top-full mt-1 w-72 card py-1 shadow-2xl z-50 max-h-[70vh] overflow-y-auto">
+          {/* Logueado: 1º privadas mías, 2º públicas mías, 3º otras públicas. */}
+          {user && myPrivate.length > 0 && (
+            <Section icon={<Building2 size={12} />} label="Privadas">
+              {myPrivate.map(p => (
+                <PencaRow
+                  key={p.tenComp.id}
+                  name={p.tenComp.name}
+                  hint={`${p.competition.name} · ${p.tenant.name}`}
+                  pending={p.memberStatus === 'pending'}
+                  active={p.tenComp.slug === activeSlug}
+                  onClick={() => choose(p.tenComp.slug)}
+                />
+              ))}
+            </Section>
+          )}
+
           {user && myPublic.length > 0 && (
             <Section icon={<Globe size={12} />} label="Públicas">
               {myPublic.map(p => (
@@ -73,26 +98,10 @@ export function CompetitionSwitcher() {
             </Section>
           )}
 
-          {user &&
-            privateByTenant.map(group => (
-              <Section key={group.tenantName} icon={<Building2 size={12} />} label={group.tenantName}>
-                {group.pencas.map(p => (
-                  <PencaRow
-                    key={p.tenComp.id}
-                    name={p.tenComp.name}
-                    hint={p.competition.name}
-                    pending={p.memberStatus === 'pending'}
-                    active={p.tenComp.slug === activeSlug}
-                    onClick={() => choose(p.tenComp.slug)}
-                  />
-                ))}
-              </Section>
-            ))}
-
-          {/* Anónimo: solo públicas. Logueado: públicas que aún no integra. */}
-          {(user ? explorablePublic : publicPencas).length > 0 && (
+          {/* Públicas activas que no integro (anónimo: todas las públicas activas). */}
+          {otherPublic.length > 0 && (
             <Section icon={<Globe size={12} />} label={user ? 'Otras públicas' : 'Pencas públicas'}>
-              {(user ? explorablePublic : publicPencas).map(p => (
+              {otherPublic.map(p => (
                 <PencaRow
                   key={p.tenComp.id}
                   name={p.tenComp.name}

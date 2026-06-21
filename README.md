@@ -92,3 +92,20 @@ El workflow `.github/workflows/release-apk.yml` compila y firma el APK automáti
 
 - **v1 (PencaLes 2026):** en producción hasta 19/07/2026 (Mundial FIFA). Schema legacy en `supabase/legacy/`.
 - **v2 (PencaLes 2.0):** en desarrollo. Migración de datos post-Mundial.
+
+
+## Backup de base de datos
+
+Backup completo de la base PostgreSQL de Supabase con `pg_dump`. Ejecutar en PowerShell:
+
+```powershell
+$env:PGPASSWORD = '<password-de-la-base>'
+cd 'C:\Program Files\PostgreSQL\17\bin\'
+.\pg_dump.exe `
+  --host=aws-1-sa-east-1.pooler.supabase.com `
+  --port=5432 `
+  --username=postgres.kxwwkdpxhcrfevauhpgy `
+  --dbname=postgres `
+  --no-owner --no-privileges `
+  -f /datos/backup.sql
+``

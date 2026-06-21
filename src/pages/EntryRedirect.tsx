@@ -6,7 +6,8 @@ import { resolveEntryTenCompSlug } from '../services/tenCompService'
 import { readLastTenCompSlug } from '../contexts/TenCompContext'
 
 // Punto de entrada ("/"): elige la competencia activa según la regla de
-// precedencia y redirige a /p/:slug. Si no hay candidato, va al hub /pencas.
+// precedencia y redirige directo a su Fixture. Si no hay candidato, va al hub
+// /pencas.
 export function EntryRedirect() {
   const { user, loading: authLoading } = useAuth()
 
@@ -24,7 +25,7 @@ export function EntryRedirect() {
     )
   }
 
-  if (!isError && data) return <Navigate to={`/p/${data}`} replace />
+  if (!isError && data) return <Navigate to={`/p/${data}/fixture`} replace />
 
   return <Navigate to="/pencas" replace />
 }

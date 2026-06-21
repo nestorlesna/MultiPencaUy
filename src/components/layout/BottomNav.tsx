@@ -30,7 +30,8 @@ export function BottomNav() {
   const { data } = useTenCompState()
 
   const base = data ? `/p/${data.tenComp.slug}` : null
-  const visible = data ? visibleMenuItems(data.tenComp.menu_config, !!user) : []
+  const isMember = data?.memberStatus === 'approved' || data?.memberStatus === 'pending'
+  const visible = data ? visibleMenuItems(data.tenComp.menu_config, isMember) : []
   const byKey = new Map(visible.map(i => [i.key, i]))
   const items = PRIORITY.filter(k => byKey.has(k))
     .slice(0, 4)

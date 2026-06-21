@@ -7,10 +7,18 @@ import {
 import { toast } from 'sonner'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { fetchCompetition, cloneCompetition, createPublicoTenComp } from '../../services/v2/adminService'
+import { fetchCompetition, cloneCompetition, createPublicoTenComp, updateCompetition } from '../../services/v2/adminService'
 import { fetchTeamsByCompetition } from '../../services/v2/teamService'
 import type { TeamWithGroup } from '../../services/teamService'
+import type { CompetitionStatus } from '../../types/tenant'
 import { Modal } from '../../components/ui/Modal'
+
+const STATUS_LABEL: Record<CompetitionStatus, string> = {
+  draft: 'Borrador',
+  active: 'Activa',
+  finished: 'Finalizada',
+  archived: 'Archivada',
+}
 
 type TeamOverride = { name: string; abbreviation: string; flag_url: string }
 type CloneArgs = {
@@ -244,6 +252,16 @@ export function CompetenciaDetailPage() {
     enabled: isSuperAdmin && !!id,
   })
 
+  const { mutate: changeStatus, isPending: savingStatus } = useMutation({
+    mutationFn: (status: CompetitionStatus) => updateCompetition(id, { status }),
+    onSuccess: (_d, status) => {
+      toast.success(`Estado cambiado a "${STATUS_LABEL[status]}"`)
+      qc.invalidateQueries({ queryKey: ['v2', 'competition', id] })
+      qc.invalidateQueries({ queryKey: ['v2', 'competitions'] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const { mutate: doClone, isPending: cloning } = useMutation({
     mutationFn: async (args: CloneArgs) => {
       const newComp = await cloneCompetition(id, args)
@@ -304,18 +322,37 @@ export function CompetenciaDetailPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => setCloneOpen(true)}
-          disabled={cloning}
-          className="btn-ghost flex items-center gap-1.5 text-xs border border-border px-3 py-2 flex-shrink-0"
-          title="Clonar competencia"
-        >
-          {cloning
-            ? <Loader2 size={14} className="animate-spin" />
-            : <Copy size={14} />
-          }
-          Clonar
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="relative">
+            <select
+              value={comp.status}
+              disabled={savingStatus}
+              onChange={e => changeStatus(e.target.value as CompetitionStatus)}
+              className="input text-xs py-2 pr-7 disabled:opacity-60"
+              title="Estado de la competencia"
+            >
+              {(Object.keys(STATUS_LABEL) as CompetitionStatus[]).map(s => (
+                <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+              ))}
+            </select>
+            {savingStatus && (
+              <Loader2 size={13} className="animate-spin text-primary absolute right-2 top-1/2 -translate-y-1/2" />
+            )}
+          </div>
+
+          <button
+            onClick={() => setCloneOpen(true)}
+            disabled={cloning}
+            className="btn-ghost flex items-center gap-1.5 text-xs border border-border px-3 py-2"
+            title="Clonar competencia"
+          >
+            {cloning
+              ? <Loader2 size={14} className="animate-spin" />
+              : <Copy size={14} />
+            }
+            Clonar
+          </button>
+        </div>
       </div>
 
       <section>

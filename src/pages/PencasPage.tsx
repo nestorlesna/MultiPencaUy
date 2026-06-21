@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { Loader2, Trophy, Globe, KeyRound, Clock, ArrowRight, ShieldCheck, Building2 } from 'lucide-react'
+import { Loader2, Trophy, Globe, KeyRound, Clock, ArrowRight, ShieldCheck, Building2, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../hooks/useAuth'
 import {
@@ -12,7 +12,15 @@ import {
 } from '../services/tenCompService'
 import { fetchTenantsByIds } from '../services/v2/adminService'
 import { Modal } from '../components/ui/Modal'
-import type { MyPenca, PublicPenca } from '../types/tenant'
+import type { MyPenca, PublicPenca, CompetitionStatus } from '../types/tenant'
+
+// Una penca pública solo se puede unir si su competencia está "Activa".
+// El resto (borrador / finalizada / archivada) se muestra en modo visualización.
+const NON_ACTIVE_BADGE: Partial<Record<CompetitionStatus, string>> = {
+  draft: 'Próximamente',
+  finished: 'Finalizada',
+  archived: 'Archivada',
+}
 
 export function PencasPage() {
   const { user, isSuperAdmin, tenantRoles } = useAuth()
@@ -44,7 +52,17 @@ export function PencasPage() {
   })
 
   const myIds = useMemo(() => new Set(myPencas.map(p => p.tenComp.id)), [myPencas])
-  const explorable = publicPencas.filter(p => !myIds.has(p.tenComp.id))
+  // No participadas; las de competencia activa (unibles) primero. El orden por
+  // fecha que trae el servicio se mantiene dentro de cada grupo (sort estable).
+  const explorable = useMemo(
+    () =>
+      publicPencas
+        .filter(p => !myIds.has(p.tenComp.id))
+        .sort((a, b) =>
+          (a.competition.status === 'active' ? 0 : 1) - (b.competition.status === 'active' ? 0 : 1)
+        ),
+    [publicPencas, myIds]
+  )
 
   // Mis pencas: públicas primero, privadas agrupadas por tenant.
   const myPublic = myPencas.filter(p => p.tenComp.visibility === 'public')
@@ -275,15 +293,32 @@ function PublicPencaCard({
   cta: string
 }) {
   const { tenComp, competition, tenant } = penca
+  const joinable = competition.status === 'active'
+  const badge = NON_ACTIVE_BADGE[competition.status]
   return (
     <div className="card p-4 flex items-start justify-between gap-2">
       <button onClick={onOpen} className="min-w-0 text-left">
-        <p className="text-sm font-medium text-text-primary truncate">{tenComp.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-text-primary truncate">{tenComp.name}</p>
+          {badge && (
+            <span className="badge bg-border text-text-muted text-[10px] flex-shrink-0">{badge}</span>
+          )}
+        </div>
         <p className="text-xs text-text-muted truncate">{competition.name} · {tenant.name}</p>
       </button>
-      <button onClick={onJoin} disabled={joining} className="btn-primary text-xs px-3 py-1.5 flex-shrink-0">
-        {joining ? <Loader2 size={14} className="animate-spin" /> : cta}
-      </button>
+      {joinable ? (
+        <button onClick={onJoin} disabled={joining} className="btn-primary text-xs px-3 py-1.5 flex-shrink-0">
+          {joining ? <Loader2 size={14} className="animate-spin" /> : cta}
+        </button>
+      ) : (
+        <button
+          onClick={onOpen}
+          className="btn-ghost text-xs px-3 py-1.5 flex-shrink-0 border border-border inline-flex items-center gap-1"
+          title="Solo visualización — esta penca aún no admite inscripciones"
+        >
+          <Eye size={13} /> Ver
+        </button>
+      )}
     </div>
   )
 }
