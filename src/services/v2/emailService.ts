@@ -126,6 +126,28 @@ export async function fetchTenCompUserDetails(tenCompId: string): Promise<TenCom
   return (data ?? []) as TenCompUserDetail[]
 }
 
+// Código de 8 letras de una penca privada (NULL si es pública). No se expone por
+// SELECT; lo trae esta RPC guardada por is_ten_comp_admin para armar la invitación.
+export async function fetchTenCompJoinCode(tenCompId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('admin_get_ten_comp_join_code', { p_ten_comp: tenCompId })
+  if (error) throw error
+  return (data ?? null) as string | null
+}
+
+// Usuarios ya registrados que juegan en otras pencas del mismo tenant y aún no
+// son miembros de esta. Para invitar jugadores de la competencia A a la B.
+export interface InvitableUser {
+  id: string
+  email: string
+  display_name: string | null
+}
+
+export async function fetchInvitableUsers(tenCompId: string): Promise<InvitableUser[]> {
+  const { data, error } = await supabase.rpc('admin_get_invitable_users', { p_ten_comp: tenCompId })
+  if (error) throw error
+  return (data ?? []) as InvitableUser[]
+}
+
 export async function fetchMatchPredictions(
   tenCompId: string,
   matchId: string

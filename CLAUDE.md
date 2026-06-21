@@ -267,7 +267,11 @@ Los tipos de bonus (podio, empates, rango de goles, etc.) se definen por compete
 - **Alcance por penca:** el panel es el tab **"Correos"** en `PencaAdminPage` (`/p/:slug/admin`) — componente `src/components/admin/CorreosTab.tsx`. Lo gestiona el admin de la penca (tenant-admin incluido). Cada destinatario es un miembro **aprobado** de ese Ten-Comp.
 - **Servicio:** `src/services/v2/emailService.ts` — todo scopeado por `tenCompId`; builders de HTML parametrizados por `EmailBrand`. Usa las RPCs `admin_get_user_details(p_ten_comp)` (emails + conteo de predicciones) y `admin_get_match_predictions(p_ten_comp, p_match_id)`, ambas guardadas por `is_ten_comp_admin`.
 - **Cola `email_queue`** (en `01_schema.sql`): trae `tenant_id` + `ten_comp_id`; RLS `is_tenant_admin`. `api/send-email.ts` autoriza con super-admin **o** admin del tenant dueño del correo.
-- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `invitacion_externa`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Invitaciones (migración `101`):** dos vías además de los miembros aprobados.
+  1. *Usuarios registrados* — `admin_get_invitable_users(p_ten_comp)` (guardada por `is_ten_comp_admin`, acotada al **mismo tenant**) lista jugadores de **otras** pencas de la empresa que aún no están en esta; el correo lleva `user_id`. Sirve para invitar a los de la competencia A a la nueva B.
+  2. *Externos* — el admin pega emails sueltos (no registrados); se encolan con `user_id = NULL` (`email_queue.user_id` es nullable, el envío solo usa `to_email`). Categoría `invitacion_externa`.
+  Ambas incluyen el **código de acceso** si la penca es privada, vía `admin_get_ten_comp_join_code(p_ten_comp)` (el `join_code` no se expone por SELECT).
 - **Pendiente:** auto-disparo de "resultado cargado" al cargar un resultado (hoy es manual desde el tab).
 
 ### Migración de datos (post 19/07/2026)

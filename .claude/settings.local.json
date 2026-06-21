@@ -54,7 +54,8 @@
       "WebFetch(domain:www.olympics.com)",
       "WebFetch(domain:espndeportes.espn.com)",
       "Bash(python *)",
-      "Read(//c/DATOS/DESARROLLOS/React/**)"
+      "Read(//c/DATOS/DESARROLLOS/React/**)",
+      "PowerShell(npx eslint src/components/admin/CorreosTab.tsx src/services/v2/emailService.ts --ext ts,tsx 2>&1 | Select-Object -First 30)"
     ]
   }
 }
