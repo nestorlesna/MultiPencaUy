@@ -1,12 +1,13 @@
 import { supabase } from '../lib/supabase'
-import type {
-  MyPenca,
-  PublicPenca,
-  TenComp,
-  Tenant,
-  Competition,
-  TenCompScoring,
-  MemberStatus,
+import {
+  isPencaArchived,
+  type MyPenca,
+  type PublicPenca,
+  type TenComp,
+  type Tenant,
+  type Competition,
+  type TenCompScoring,
+  type MemberStatus,
 } from '../types/tenant'
 
 // Columnas reutilizables del Ten-Comp y sus relaciones.
@@ -50,7 +51,8 @@ export async function fetchMyTenComps(userId: string): Promise<MyPenca[]> {
 }
 
 // Pencas públicas para explorar / auto-seleccionar (más reciente primero).
-// Excluye solo las archivadas; sirve también de candidatas para EntryRedirect.
+// Excluye las archivadas —por Ten-Comp o por competencia—; sirve también de
+// candidatas para EntryRedirect.
 export async function fetchPublicTenComps(): Promise<PublicPenca[]> {
   const { data, error } = await supabase
     .from('ten_comps')
@@ -60,17 +62,18 @@ export async function fetchPublicTenComps(): Promise<PublicPenca[]> {
        competition:competition_id ( ${COMP_COLS} )`
     )
     .eq('visibility', 'public')
-    .neq('status', 'archived')
     .order('created_at', { ascending: false })
 
   if (error) throw error
 
-  return (data ?? []).map((tc: any): PublicPenca => ({
-    tenComp: stripTenComp(tc),
-    tenant: tc.tenant,
-    competition: tc.competition,
-    createdAt: tc.created_at,
-  }))
+  return (data ?? [])
+    .map((tc: any): PublicPenca => ({
+      tenComp: stripTenComp(tc),
+      tenant: tc.tenant,
+      competition: tc.competition,
+      createdAt: tc.created_at,
+    }))
+    .filter(p => !isPencaArchived(p))
 }
 
 // Resuelve qué Ten-Comp debe quedar activo al entrar sin slug en la URL.
@@ -85,10 +88,11 @@ export async function resolveEntryTenCompSlug(
     fetchPublicTenComps(),
   ])
 
-  // Solo pencas activas (no archivadas) son candidatas para entrar.
-  // (fetchPublicTenComps ya excluye archivadas; mis pencas pueden incluirlas.)
-  const mine = mineAll.filter(p => p.tenComp.status !== 'archived')
-  const publics = publicsAll.filter(p => p.tenComp.status !== 'archived')
+  // Solo pencas activas (no archivadas por Ten-Comp ni por competencia) son
+  // candidatas para entrar. (fetchPublicTenComps ya excluye archivadas; mis
+  // pencas pueden incluirlas.)
+  const mine = mineAll.filter(p => !isPencaArchived(p))
+  const publics = publicsAll.filter(p => !isPencaArchived(p))
 
   // 1. Si el usuario tiene pencas propias activas, SIEMPRE priorizo las suyas.
   //    La "última usada" solo se respeta si es una de mis pencas (continuidad

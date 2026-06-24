@@ -35,7 +35,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth AS $$
 DECLARE v_tenant UUID;
 BEGIN
   IF NOT is_ten_comp_admin(p_ten_comp) THEN RAISE EXCEPTION 'Access denied'; END IF;
-  SELECT tenant_id INTO v_tenant FROM ten_comps WHERE id = p_ten_comp;
+  SELECT tenant_id INTO v_tenant FROM ten_comps WHERE ten_comps.id = p_ten_comp;
 
   RETURN QUERY
   SELECT DISTINCT au.id, au.email::text, pr.display_name::text

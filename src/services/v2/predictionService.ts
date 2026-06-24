@@ -24,6 +24,43 @@ export interface PredictionInputV2 {
   predictedPkWinnerId?: string | null
 }
 
+// Distribución 1X2 de los pronósticos del resto (todas las pencas de la
+// competencia) para un partido. Conteos crudos; el % se calcula en la UI.
+export interface MatchPredictionStats {
+  home: number
+  draw: number
+  away: number
+  total: number
+}
+
+export async function fetchMatchPredictionStats(matchId: string): Promise<MatchPredictionStats> {
+  const { data, error } = await supabase.rpc('match_prediction_stats', { p_match_id: matchId })
+  if (error) throw error
+  const row = (data?.[0] ?? {}) as Partial<{
+    home_count: number; draw_count: number; away_count: number; total: number
+  }>
+  return {
+    home: row.home_count ?? 0,
+    draw: row.draw_count ?? 0,
+    away: row.away_count ?? 0,
+    total: row.total ?? 0,
+  }
+}
+
+// Top de resultados exactos más apostados por el resto de la competencia.
+export interface MatchTopScore {
+  home: number
+  away: number
+  count: number
+}
+
+export async function fetchMatchTopScores(matchId: string): Promise<MatchTopScore[]> {
+  const { data, error } = await supabase.rpc('match_top_scores', { p_match_id: matchId, p_limit: 5 })
+  if (error) throw error
+  return ((data ?? []) as { home_score: number; away_score: number; cnt: number }[])
+    .map(r => ({ home: r.home_score, away: r.away_score, count: r.cnt }))
+}
+
 export async function upsertPredictionV2(userId: string, input: PredictionInputV2): Promise<void> {
   const { error } = await supabase.from('predictions').upsert(
     {

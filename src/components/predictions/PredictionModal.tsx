@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Minus, Plus, Lock } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { TeamFlag } from '../ui/TeamFlag'
 import { upsertPrediction, deletePrediction } from '../../services/predictionService'
-import { upsertPredictionV2, deletePredictionV2 } from '../../services/v2/predictionService'
+import { upsertPredictionV2, deletePredictionV2, fetchMatchPredictionStats, fetchMatchTopScores } from '../../services/v2/predictionService'
 import { useAuth } from '../../hooks/useAuth'
 import { useInvalidatePredictions } from '../../hooks/usePredictions'
 import type { MatchWithRelations } from '../../types/match'
 import type { PredictionWithMatch } from '../../services/predictionService'
-import type { PredictionV2 } from '../../services/v2/predictionService'
+import type { PredictionV2, MatchPredictionStats, MatchTopScore } from '../../services/v2/predictionService'
 
 interface Props {
   match: MatchWithRelations | null
@@ -47,6 +47,67 @@ function ScoreInput({ value, onChange }: { value: number; onChange: (v: number) 
       >
         <Plus size={14} />
       </button>
+    </div>
+  )
+}
+
+function PredictionDistribution({ stats, homeLabel, awayLabel }: {
+  stats?: MatchPredictionStats
+  homeLabel: string
+  awayLabel: string
+}) {
+  if (!stats || stats.total === 0) {
+    return (
+      <p className="text-[11px] text-text-muted text-center">
+        Todavía nadie más apostó este partido.
+      </p>
+    )
+  }
+  const pct = (n: number) => Math.round((n / stats.total) * 100)
+  const home = pct(stats.home)
+  const draw = pct(stats.draw)
+  const away = pct(stats.away)
+  return (
+    <div>
+      <p className="text-[11px] text-text-muted text-center mb-1.5">
+        Pronósticos de la competencia · {stats.total} {stats.total === 1 ? 'apuesta' : 'apuestas'}
+      </p>
+      <div className="flex h-2 rounded-full overflow-hidden bg-surface-2">
+        <div className="bg-primary" style={{ width: `${home}%` }} />
+        <div className="bg-text-muted/60" style={{ width: `${draw}%` }} />
+        <div className="bg-accent" style={{ width: `${away}%` }} />
+      </div>
+      <div className="flex justify-between text-[11px] mt-1 tabular-nums">
+        <span className="text-primary font-medium truncate max-w-[33%]">{homeLabel} {home}%</span>
+        <span className="text-text-muted">Empate {draw}%</span>
+        <span className="text-accent font-medium truncate max-w-[33%] text-right">{awayLabel} {away}%</span>
+      </div>
+    </div>
+  )
+}
+
+function TopScoresChart({ scores }: { scores?: MatchTopScore[] }) {
+  if (!scores || scores.length === 0) return null
+  const max = Math.max(...scores.map(s => s.count))
+  return (
+    <div>
+      <p className="text-[11px] text-text-muted text-center mb-2">Resultados más apostados</p>
+      <div className="space-y-1.5">
+        {scores.map(s => (
+          <div key={`${s.home}-${s.away}`} className="flex items-center gap-2">
+            <span className="w-8 text-xs font-semibold tabular-nums text-text-primary text-right">
+              {s.home}-{s.away}
+            </span>
+            <div className="flex-1 h-3.5 bg-surface-2 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary/70 rounded-full transition-all"
+                style={{ width: `${Math.max(8, (s.count / max) * 100)}%` }}
+              />
+            </div>
+            <span className="w-5 text-[11px] tabular-nums text-text-muted text-right">{s.count}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -152,6 +213,18 @@ export function PredictionModal({ match, existing, onClose, tenCompId }: Props) 
     onError: (e: Error) => toast.error(e.message),
   })
 
+  // Distribución 1X2 + top de resultados del resto de la competencia.
+  const { data: stats } = useQuery({
+    queryKey: ['match-prediction-stats', match?.id],
+    queryFn: () => fetchMatchPredictionStats(match!.id),
+    enabled: !!match,
+  })
+  const { data: topScores } = useQuery({
+    queryKey: ['match-top-scores', match?.id],
+    queryFn: () => fetchMatchTopScores(match!.id),
+    enabled: !!match,
+  })
+
   if (!match) return null
 
   const isKnockout = match.phase.has_extra_time
@@ -222,6 +295,16 @@ export function PredictionModal({ match, existing, onClose, tenCompId }: Props) 
             </div>
           </div>
         </div>
+
+        {/* Qué apostó el resto de la competencia (distribución 1X2 a 90') */}
+        <PredictionDistribution
+          stats={stats}
+          homeLabel={match.home_team?.abbreviation ?? match.home_slot_label ?? 'Local'}
+          awayLabel={match.away_team?.abbreviation ?? match.away_slot_label ?? 'Visitante'}
+        />
+
+        {/* Top 5 de resultados más apostados */}
+        <TopScoresChart scores={topScores} />
 
         {/* Tiempo extra */}
         {isKnockout && (

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Trophy, ChevronDown, Globe, Building2, Check, Plus, Clock } from 'lucide-react'
 import { useTenCompState } from '../../contexts/TenCompContext'
 import { useAuth } from '../../hooks/useAuth'
+import { isPencaArchived } from '../../types/tenant'
 
 // Selector de competencia activa (arriba-izquierda de la barra superior).
 // Muestra el nombre de la penca activa y un combo para cambiar entre pencas.
@@ -21,12 +22,13 @@ export function CompetitionSwitcher() {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // Solo pencas activas (no archivadas), ordenadas por creación descendente.
+  // Solo pencas activas (no archivadas por Ten-Comp ni por competencia),
+  // ordenadas por creación descendente.
   const byNewest = (a: { createdAt: string }, b: { createdAt: string }) =>
     b.createdAt.localeCompare(a.createdAt)
 
   const myActive = useMemo(
-    () => myPencas.filter(p => p.tenComp.status !== 'archived'),
+    () => myPencas.filter(p => !isPencaArchived(p)),
     [myPencas]
   )
   // 1º Privadas mías, 2º Públicas mías.
@@ -42,7 +44,7 @@ export function CompetitionSwitcher() {
   const myIds = useMemo(() => new Set(myPencas.map(p => p.tenComp.id)), [myPencas])
   const otherPublic = useMemo(
     () => publicPencas
-      .filter(p => p.tenComp.status !== 'archived' && !myIds.has(p.tenComp.id))
+      .filter(p => !isPencaArchived(p) && !myIds.has(p.tenComp.id))
       .sort(byNewest),
     [publicPencas, myIds]
   )

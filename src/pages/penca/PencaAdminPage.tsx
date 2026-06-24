@@ -63,7 +63,9 @@ export function PencaAdminPage() {
     <div>
       <div className="flex items-center gap-2 mb-4">
         <ShieldCheck size={20} className="text-accent" />
-        <h1 className="text-xl font-bold text-text-primary">Administración</h1>
+        <h1 className="text-xl font-bold text-text-primary">
+          Administración <span className="text-text-secondary font-normal">({competition.name})</span>
+        </h1>
       </div>
 
       <div className="flex gap-1 overflow-x-auto pb-2 mb-4 border-b border-border">

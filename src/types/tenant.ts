@@ -101,6 +101,16 @@ export interface PublicPenca {
   createdAt: string
 }
 
+// Una penca cuenta como "archivada" si lo está el Ten-Comp o su competencia.
+// Archivar la competencia archiva todas sus pencas, en todos los tenants:
+// se ocultan del switcher / explorar y quedan en solo lectura histórica.
+export function isPencaArchived(p: {
+  tenComp: Pick<TenComp, 'status'>
+  competition: Pick<Competition, 'status'>
+}): boolean {
+  return p.tenComp.status === 'archived' || p.competition.status === 'archived'
+}
+
 // Contexto activo resuelto por slug (/p/:slug/*).
 export interface TenCompContextData {
   tenComp: TenComp
