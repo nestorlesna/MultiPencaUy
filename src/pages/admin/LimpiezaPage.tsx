@@ -179,7 +179,7 @@ function CompetitionRow({ item, onDelete }: { item: CompetitionForCleanup; onDel
         <div className="flex items-center gap-2 flex-wrap">
           <Chip>{item.ten_comp_count} pencas</Chip>
           <Chip>{item.match_count} partidos</Chip>
-          <Chip warn>{item.team_count} equipos (se huerfanizan)</Chip>
+          <Chip warn>{item.team_count} equipos (se eliminan)</Chip>
         </div>
       </div>
       <button
@@ -309,14 +309,9 @@ function CompetitionDeleteWarning({ item }: { item: CompetitionForCleanup }) {
       <ul className="list-disc list-inside space-y-1 text-xs pl-1">
         <li>Todas las fases, grupos, estadios</li>
         <li>Todos los partidos ({item.match_count})</li>
+        <li>Los {item.team_count} equipos de esta competencia</li>
         <li>Todas las pencas (ten-comps) asociadas ({item.ten_comp_count}) y sus predicciones</li>
       </ul>
-      {item.team_count > 0 && (
-        <p className="text-xs text-amber-400 flex items-start gap-1.5 mt-1">
-          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
-          Los {item.team_count} equipos <strong>no se eliminarán</strong> — quedarán huérfanos (sin competencia asignada).
-        </p>
-      )}
     </div>
   )
 }
@@ -334,7 +329,7 @@ function TenantDeleteWarning({ item }: { item: TenantForCleanup }) {
           <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
           <span>
             Las {item.owned_competition_count} competencias de este tenant:
-            si solo las usa este tenant → se eliminarán con sus partidos y equipos huérfanos.
+            si solo las usa este tenant → se eliminarán por completo (partidos y equipos incluidos).
             Si otros tenants también las usan → solo se quitará la propiedad.
           </span>
         </div>

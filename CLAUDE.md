@@ -232,12 +232,43 @@ El mismo schema cubre varios formatos sin cambios estructurales; lo que cambia e
 - **Transformación de equipos:** un mapa opcional `old_team_id → { name, abbreviation, flag_url }` renombra cada equipo en la copia manteniendo intacta la estructura (series/grupos y fixture). El remapeo `old→new` se reconstruye por la **nueva** abreviatura, así sigue funcionando aunque se renombre todo. El modal precarga la identidad original, exige completar todas las filas y valida que las abreviaturas sean únicas.
 - **Penca en Publico automática:** al terminar el clonado se crea una penca pública (Ten-Comp) en el tenant **Publico** vía `createPublicoTenComp` (slug libre derivado del nombre, `visibility: public`, `bonus_enabled: false`). Una competencia es catálogo **global** (no pertenece a un tenant); lo que la asocia a una empresa es un Ten-Comp. Si falla la creación de la penca (o no existe el tenant Publico) la competencia clonada **no** se revierte: se avisa por toast. Para sumarla a otros tenants: `/t/:slug/admin` → "Nueva penca" (el selector incluye competencias en `draft`).
 
+### Limpieza de datos (super-admin)
+
+`/admin/limpieza` (`LimpiezaPage`) borra físicamente competencias y tenants. El borrado es **transaccional vía RPC** (migración `99_admin_cleanup.sql`, guardadas por `is_super_admin()`); el frontend `adminCleanupService.ts` solo llama `admin_delete_competition(p_competition_id)` / `admin_delete_tenant(p_tenant_id)`.
+
+- `admin_delete_competition` borra en orden seguro: `ten_comps` (cascada predicciones/bonus) → `matches` → `teams` → `competitions`. Hace falta borrar `ten_comps` primero porque `ten_comps.competition_id` es `ON DELETE RESTRICT`; y borrar `matches`/predicciones antes que `teams` porque las FKs a `teams` son `NO ACTION`. **Los equipos se eliminan, no se huerfanizan** — no se comparten entre competencias (el clonado crea filas nuevas).
+- `admin_delete_tenant`: por cada competencia propia, si otro tenant la usa quita la propiedad (`owner_tenant_id = NULL`), si no la borra entera; al final `DELETE tenants` cascada los `ten_comps` restantes y `tenant_roles`. El tenant Público no se puede borrar.
+
+### Estados de penca y competencia (archivado)
+
+`ten_comps.status`: `open` (predice / se une) · `closed` (congela: ni nuevos miembros ni predicciones, pero **sigue visible**) · `archived` (solo lectura histórica; además se oculta del switcher y de "explorar públicas", y no es candidata de `EntryRedirect`). Cerrada y archivada bloquean igual la escritura (RLS exige `status = 'open'`); la única diferencia es la **visibilidad**.
+
+**Archivar una COMPETENCIA (`competitions.status = 'archived'`) propaga ese bloqueo a TODAS sus pencas, en todos los tenants** (migración `103`). El gate de escritura, antes solo `ten_comps.status = 'open'`, ahora también exige `competitions.status <> 'archived'` en: RLS de `predictions` (insert/update), RLS de `bonus_predictions` (insert/update) y las RPC `join_ten_comp_public` / `join_ten_comp_private` (lanzan "La competencia está archivada"). La lectura queda abierta. En el frontend el helper `isPencaArchived(p)` = `tenComp.status === 'archived' || competition.status === 'archived'` (`types/tenant.ts`) unifica el criterio; lo usan `fetchPublicTenComps`, `resolveEntryTenCompSlug` y `CompetitionSwitcher` para ocultar ambos casos.
+
+### Stats de "qué apostaron los demás" (popup de carga)
+
+`PredictionModal` muestra, bajo el marcador, la opinión del resto de la competencia para ese partido (migración `104`, dos RPC `SECURITY DEFINER` que devuelven **solo conteos** agregados y excluyen la apuesta propia vía `auth.uid()` — nunca filas individuales):
+- `match_prediction_stats(p_match_id)` → distribución 1X2 a 90' (barra local / empate / visitante).
+- `match_top_scores(p_match_id, p_limit)` → top 5 de resultados exactos más repetidos (mini gráfica de barras).
+
+Como un partido pertenece a una sola competencia, agregar por `match_id` cubre las apuestas de **todas las pencas** de esa competencia. Servicios en `src/services/v2/predictionService.ts` (`fetchMatchPredictionStats`, `fetchMatchTopScores`).
+
+### Fixture: posición inicial
+
+`PencaFixturePage` agrupa los partidos por fecha y, al entrar (vista sin filtro, una sola vez por competencia vía `scrolledForRef`), hace auto-scroll a la sección del **día actual** — o a la primera fecha futura, o a la última si el campeonato ya terminó. Compara `matchDateKey` (YYYY-MM-DD en zona local) con hoy; muestra **todos** los partidos del día sin importar la hora. Cada `<section>` lleva `scroll-mt-20` para no quedar tapada por el header sticky.
+
 ### Flujo de cálculo de puntos
 
 1. Cargador (admin/loader de tenant) carga resultado → RPC `set_match_result(competition_id, match_id, ...)`
 2. RPC `calculate_match_points(match_id)` itera **todos los Ten-Comps** de esa competencia y aplica el scoring propio de cada uno
 3. RPC `calculate_bonus_points(competition_id)` — idempotente, corre por cada Ten-Comp con `bonus_enabled = true`
 4. El resultado es un hecho deportivo compartido; los puntos son por Ten-Comp
+
+**Ligas vs eliminatorias en el scoring (migración `100`):** un partido es *knockout* (suma `knockout_exact_score_bonus` y evalúa ET/penales) **solo si la competencia tiene `advancement_engine` y el partido no es de grupo**. Antes se asumía knockout por `group_id IS NULL`, lo que rompía en ligas (Apertura) donde *todos* los partidos no tienen grupo. Por la misma razón `recalculate_all` ahora solo llama a `populate_knockout` si la competencia tiene motor de avance (sin motor lanzaba "sin motor de avance" y abortaba todo el recálculo).
+
+**Posiciones:**
+- *Liga de tabla única* (Apertura): se calcula en el frontend (`leagueStandingsService.fetchLeagueStandings`). Lista **todos** los equipos del fixture (arrancan en 0 aunque no hayan jugado), desempate PTS→DG→GF→**enfrentamiento directo**→nombre. No se persiste ni se "crea al clonar": es derivada en vivo.
+- *Series* (Intermedio): vista `group_standings` (una tabla por serie), ya lista todos los equipos en 0; desempate PTS→DG→GF→nombre (sin head-to-head).
 
 ### Known gotcha: columna `sort_order` (antes `order`)
 
@@ -254,7 +285,11 @@ Los tipos de bonus (podio, empates, rango de goles, etc.) se definen por compete
 - **Alcance por penca:** el panel es el tab **"Correos"** en `PencaAdminPage` (`/p/:slug/admin`) — componente `src/components/admin/CorreosTab.tsx`. Lo gestiona el admin de la penca (tenant-admin incluido). Cada destinatario es un miembro **aprobado** de ese Ten-Comp.
 - **Servicio:** `src/services/v2/emailService.ts` — todo scopeado por `tenCompId`; builders de HTML parametrizados por `EmailBrand`. Usa las RPCs `admin_get_user_details(p_ten_comp)` (emails + conteo de predicciones) y `admin_get_match_predictions(p_ten_comp, p_match_id)`, ambas guardadas por `is_ten_comp_admin`.
 - **Cola `email_queue`** (en `01_schema.sql`): trae `tenant_id` + `ten_comp_id`; RLS `is_tenant_admin`. `api/send-email.ts` autoriza con super-admin **o** admin del tenant dueño del correo.
-- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Tipos de correo:** `sin_predicciones`, `ranking`, `partido_M{n}` (resultado), `invitacion`, `invitacion_externa`, `recordatorio`. Envío masivo con pausa de 15 s entre cada uno.
+- **Invitaciones (migración `101`):** dos vías además de los miembros aprobados.
+  1. *Usuarios registrados* — `admin_get_invitable_users(p_ten_comp)` (guardada por `is_ten_comp_admin`, acotada al **mismo tenant**) lista jugadores de **otras** pencas de la empresa que aún no están en esta; el correo lleva `user_id`. Sirve para invitar a los de la competencia A a la nueva B. (La migración `102` corrige una ambigüedad de columna `id` en el `SELECT … INTO` que hacía abortar el RPC con "column reference id is ambiguous" → 0 invitables.)
+  2. *Externos* — el admin pega emails sueltos (no registrados); se encolan con `user_id = NULL` (`email_queue.user_id` es nullable, el envío solo usa `to_email`). Categoría `invitacion_externa`.
+  Ambas incluyen el **código de acceso** si la penca es privada, vía `admin_get_ten_comp_join_code(p_ten_comp)` (el `join_code` no se expone por SELECT).
 - **Pendiente:** auto-disparo de "resultado cargado" al cargar un resultado (hoy es manual desde el tab).
 
 ### Migración de datos (post 19/07/2026)

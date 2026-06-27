@@ -49,7 +49,15 @@
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 20)",
       "WebFetch(domain:es.wikipedia.org)",
       "WebFetch(domain:www.auf.org.uy)",
-      "WebFetch(domain:www.promiedos.com.ar)"
+      "WebFetch(domain:www.promiedos.com.ar)",
+      "WebFetch(domain:www.conmebol.com)",
+      "WebFetch(domain:www.olympics.com)",
+      "WebFetch(domain:espndeportes.espn.com)",
+      "Bash(python *)",
+      "Read(//c/DATOS/DESARROLLOS/React/**)",
+      "PowerShell(npx eslint src/components/admin/CorreosTab.tsx src/services/v2/emailService.ts --ext ts,tsx 2>&1 | Select-Object -First 30)",
+      "Bash(cp /tmp/diag.mjs ./diag.mjs)",
+      "Bash(node ./diag.mjs)"
     ]
   }
 }

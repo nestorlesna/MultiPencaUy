@@ -100,8 +100,10 @@ export function AuthPage() {
     }
   }
 
-  // Si ya está logueado y activo, redirigir (excepto en reset: la sesión recovery es legítima)
-  if (user && isActive && tab !== 'reset') return <Navigate to="/fixture" replace />
+  // Si ya está logueado y activo, redirigir a la entrada (EntryRedirect resuelve
+  // la penca propia del usuario; nunca cae directo en una pública ajena).
+  // Excepto en reset: la sesión recovery es legítima.
+  if (user && isActive && tab !== 'reset') return <Navigate to="/" replace />
 
   async function handleResendConfirmation() {
     if (!pendingConfirmEmail) return

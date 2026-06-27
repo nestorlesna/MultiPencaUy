@@ -2,7 +2,8 @@ import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Loader2, Mail, Send, Trash2, CheckCircle2, XCircle, Clock,
-  ChevronDown, ChevronUp, RefreshCw, AlertTriangle, Trophy, Swords, Ticket, Bell, Eye, X,
+  ChevronDown, ChevronUp, RefreshCw, AlertTriangle, Trophy, Swords, Bell, Eye, X,
+  UserPlus, AtSign,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
@@ -12,9 +13,11 @@ import { fetchMatches } from '../../services/v2/matchService'
 import {
   fetchEmailQueue, enqueueEmails, deleteEmail, deleteAllEmails,
   sendEmailViaApi, fetchTenCompUserDetails, fetchMatchPredictions,
+  fetchTenCompJoinCode, fetchInvitableUsers,
   buildSinPrediccionesEmail, buildRankingEmail, buildResultadoEmail,
   buildInvitacionEmail, buildRecordatorioEmail,
   type EmailBrand, type EmailQueueEntry, type CreateEmailInput, type MatchInfoForEmail,
+  type InvitableUser,
 } from '../../services/v2/emailService'
 import type { MatchWithRelations } from '../../types/match'
 
@@ -48,6 +51,15 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
   const { data: queue = [], isLoading: loadingQueue } = useQuery({
     queryKey: ['v2', 'email-queue', tenCompId],
     queryFn: () => fetchEmailQueue(tenCompId),
+  })
+  // Código de invitación (penca privada) e invitables del mismo tenant.
+  const { data: joinCode = null } = useQuery({
+    queryKey: ['v2', 'join-code', tenCompId],
+    queryFn: () => fetchTenCompJoinCode(tenCompId),
+  })
+  const { data: invitables = [] } = useQuery({
+    queryKey: ['v2', 'invitable-users', tenCompId],
+    queryFn: () => fetchInvitableUsers(tenCompId),
   })
 
   const invalidateQueue = () => qc.invalidateQueries({ queryKey: ['v2', 'email-queue', tenCompId] })
@@ -148,16 +160,35 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
         pending={enqueueMut.isPending}
       />
 
-      {/* ── Invitación ── */}
-      <InvitacionSection
-        recipients={recipients}
-        nameOf={nameOf}
+      {/* ── Invitar usuarios registrados (otras pencas del mismo tenant) ── */}
+      <InvitarRegistradosSection
+        invitables={invitables}
         queue={queue}
-        onEnqueue={(uids) => enqueueMut.mutate(uids.map(uid => ({
-          ...baseEntry(uid),
+        onEnqueue={(users) => enqueueMut.mutate(users.map(u => ({
+          tenant_id: tenantId,
+          ten_comp_id: tenCompId,
+          to_email: u.email,
+          to_name: u.display_name || u.email,
+          user_id: u.id,
           subject: `🎟️ Te invitamos a ${brand.pencaName}`,
-          body_html: buildInvitacionEmail(brand, nameOf(uid), null),
+          body_html: buildInvitacionEmail(brand, u.display_name || 'jugador', joinCode),
           category: 'invitacion',
+        })))}
+        pending={enqueueMut.isPending}
+      />
+
+      {/* ── Invitar por email a externos (no registrados) ── */}
+      <InvitarExternosSection
+        joinCode={joinCode}
+        onEnqueue={(emails) => enqueueMut.mutate(emails.map(em => ({
+          tenant_id: tenantId,
+          ten_comp_id: tenCompId,
+          to_email: em,
+          to_name: em.split('@')[0],
+          user_id: null,
+          subject: `🎟️ Te invitamos a ${brand.pencaName}`,
+          body_html: buildInvitacionEmail(brand, em.split('@')[0], joinCode),
+          category: 'invitacion_externa',
         })))}
         pending={enqueueMut.isPending}
       />
@@ -349,19 +380,67 @@ function ResultadoSection({ recipients, nameOf, matches, queue, onEnqueue, pendi
   )
 }
 
-function InvitacionSection({ recipients, nameOf, queue, onEnqueue, pending }: {
-  recipients: Member[]; nameOf: (uid: string) => string; queue: EmailQueueEntry[]
-  onEnqueue: (uids: string[]) => void; pending: boolean
+// Invitar a usuarios YA registrados que juegan en otras pencas del mismo tenant
+// (p. ej. los de la competencia A) a esta penca. Cada uno tiene user_id.
+function InvitarRegistradosSection({ invitables, queue, onEnqueue, pending }: {
+  invitables: InvitableUser[]; queue: EmailQueueEntry[]
+  onEnqueue: (users: InvitableUser[]) => void; pending: boolean
 }) {
   const { selected, setSelected, toggle, clear } = useSelection()
   const queued = new Set(queue.filter(e => e.category === 'invitacion').map(e => e.user_id!).filter(Boolean))
+  const nameOf = (uid: string) => {
+    const u = invitables.find(x => x.id === uid)
+    return u?.display_name || u?.email || 'Usuario'
+  }
+  const recipients = invitables.map(u => ({ user_id: u.id, status: 'approved' }))
   return (
-    <Section icon={Ticket} title="Invitación a la penca" count={recipients.length} color="text-accent">
-      <p className="text-xs text-text-muted">Mandá el enlace de la penca a los miembros.</p>
+    <Section icon={UserPlus} title="Invitar usuarios registrados" count={invitables.length} color="text-accent">
+      <p className="text-xs text-text-muted">
+        Jugadores de otras pencas de esta empresa que todavía no están en esta. Les llega
+        el enlace para sumarse (con el código de acceso si la penca es privada).
+      </p>
       <Picker recipients={recipients} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-        selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
-      <EnqueueButton count={selected.size} pending={pending} label="Agregar a la cola" icon={Ticket}
-        onClick={() => { onEnqueue([...selected]); clear() }} />
+        selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear}
+        rightFor={uid => {
+          const u = invitables.find(x => x.id === uid)
+          return u?.display_name ? <span className="text-[11px] text-text-muted flex-shrink-0 truncate max-w-[160px]">{u.email}</span> : null
+        }} />
+      <EnqueueButton count={selected.size} pending={pending} label="Agregar a la cola" icon={UserPlus}
+        onClick={() => { onEnqueue(invitables.filter(u => selected.has(u.id))); clear() }} />
+    </Section>
+  )
+}
+
+// Invitar por email a personas que NO están registradas en la app. Sin user_id;
+// el correo lleva el enlace y, si la penca es privada, el código de acceso.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function InvitarExternosSection({ joinCode, onEnqueue, pending }: {
+  joinCode: string | null; onEnqueue: (emails: string[]) => void; pending: boolean
+}) {
+  const [raw, setRaw] = useState('')
+  const parsed = raw.split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
+  const unique = Array.from(new Set(parsed))
+  const valid = unique.filter(e => EMAIL_RE.test(e))
+  const invalid = unique.filter(e => !EMAIL_RE.test(e))
+  return (
+    <Section icon={AtSign} title="Invitar por email (externos)" color="text-accent">
+      <p className="text-xs text-text-muted">
+        Para personas que aún no usan la app. Pegá uno o varios correos (separados por coma,
+        espacio o salto de línea).{joinCode ? ' El correo incluye el código de acceso de la penca privada.' : ''}
+      </p>
+      <textarea
+        value={raw}
+        onChange={e => setRaw(e.target.value)}
+        rows={4}
+        placeholder="ana@mail.com, juan@mail.com…"
+        className="input w-full text-sm font-mono"
+      />
+      <div className="flex items-center gap-3 text-xs flex-wrap">
+        {valid.length > 0 && <span className="text-primary">{valid.length} válidos</span>}
+        {invalid.length > 0 && <span className="text-error">{invalid.length} inválidos: {invalid.slice(0, 3).join(', ')}{invalid.length > 3 ? '…' : ''}</span>}
+      </div>
+      <EnqueueButton count={valid.length} pending={pending} label="Agregar a la cola" icon={AtSign}
+        onClick={() => { onEnqueue(valid); setRaw('') }} />
     </Section>
   )
 }

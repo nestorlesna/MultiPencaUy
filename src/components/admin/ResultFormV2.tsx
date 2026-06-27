@@ -102,6 +102,11 @@ export function ResultFormV2({ match, competitionId, onClose }: Props) {
       toast.success(`Resultado guardado · ${r.predictions_updated} predicciones · ${r.bonus_rows_updated} bonus`)
       qc.invalidateQueries({ queryKey: ['v2', 'matches', competitionId] })
       qc.invalidateQueries({ queryKey: ['v2', 'admin-matches', competitionId] })
+      // Las posiciones (liga/serie) y el ranking dependen del resultado recién
+      // cargado; refrescarlos para que reflejen el cambio sin recargar.
+      qc.invalidateQueries({ queryKey: ['v2', 'league_standings', competitionId] })
+      qc.invalidateQueries({ queryKey: ['v2', 'group_standings', competitionId] })
+      qc.invalidateQueries({ queryKey: ['v2', 'leaderboard'] })
       onClose()
     },
     onError: (e: Error) => toast.error(e.message),

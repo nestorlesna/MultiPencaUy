@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { MatchCard } from '../../components/matches/MatchCard'
@@ -74,6 +74,29 @@ export function PencaFixturePage() {
       matches: items,
     }))
   }, [matches])
+
+  // Auto-scroll al entrar: posicionar en los partidos de hoy. Si no hay partidos
+  // hoy, en la primera fecha futura; si el campeonato ya terminó, en la última.
+  // Solo en la vista por defecto (sin filtro) y una sola vez por competencia.
+  const filtersDefault = phaseOrder === undefined && groupName === undefined && roundNumber === undefined
+  const todayKey = useMemo(() => new Date().toLocaleDateString('en-CA'), [])
+  const targetDateKey = useMemo(() => {
+    if (groupedByDate.length === 0) return null
+    const upcoming = groupedByDate.find(g => g.dateKey >= todayKey)
+    return (upcoming ?? groupedByDate[groupedByDate.length - 1]).dateKey
+  }, [groupedByDate, todayKey])
+
+  const sectionRefs = useRef<Map<string, HTMLElement>>(new Map())
+  const scrolledForRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!filtersDefault || !targetDateKey) return
+    if (scrolledForRef.current === compId) return
+    const el = sectionRefs.current.get(targetDateKey)
+    if (!el) return
+    scrolledForRef.current = compId
+    requestAnimationFrame(() => el.scrollIntoView({ block: 'start' }))
+  }, [filtersDefault, targetDateKey, compId])
 
   return (
     <div>
@@ -157,7 +180,11 @@ export function PencaFixturePage() {
             <p className="text-text-muted text-sm text-center py-8">No hay partidos para mostrar.</p>
           )}
           {groupedByDate.map(({ dateKey, label, matches: dayMatches }) => (
-            <section key={dateKey}>
+            <section
+              key={dateKey}
+              ref={el => { if (el) sectionRefs.current.set(dateKey, el); else sectionRefs.current.delete(dateKey) }}
+              className="scroll-mt-20"
+            >
               <h2 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-2 capitalize">
                 {label}
               </h2>

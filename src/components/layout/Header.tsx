@@ -35,9 +35,11 @@ export function Header() {
     ? (profile.display_name || profile.username)[0].toUpperCase()
     : 'U'
 
-  // Menú dinámico de la competencia activa.
+  // Menú dinámico de la competencia activa. Los ítems de participación solo se
+  // muestran si el usuario es miembro (pending/approved) de esta penca.
   const base = data ? `/p/${data.tenComp.slug}` : null
-  const menuItems = data ? visibleMenuItems(data.tenComp.menu_config, !!user) : []
+  const isMember = data?.memberStatus === 'approved' || data?.memberStatus === 'pending'
+  const menuItems = data ? visibleMenuItems(data.tenComp.menu_config, isMember) : []
 
   return (
     <>
