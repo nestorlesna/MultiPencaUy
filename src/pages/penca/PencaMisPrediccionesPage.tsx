@@ -399,7 +399,8 @@ function HistorialTab({
 // Se muestra cuando el usuario logueado NO es miembro de la penca: no puede
 // predecir hasta unirse. Pública → se une al instante; privada → necesita código.
 function JoinGate() {
-  const { tenComp, refetch } = useTenCompState()
+  const { tenComp } = useTenComp()
+  const { refetch } = useTenCompState()
   const qc = useQueryClient()
   const isPublic = tenComp.visibility === 'public'
 
