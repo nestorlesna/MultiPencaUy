@@ -1,13 +1,17 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Loader2, Trophy } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTenComp } from '../../contexts/TenCompContext'
 import { fetchLeaderboard } from '../../services/v2/leaderboardService'
 import { LeaderboardView } from '../../components/leaderboard/LeaderboardView'
+import { UserScoreDetailModal } from '../../components/leaderboard/UserScoreDetailModal'
+import type { LeaderboardEntry } from '../../types'
 
 export function PencaRankingPage() {
   const { tenComp } = useTenComp()
   const { user } = useAuth()
+  const [selected, setSelected] = useState<LeaderboardEntry | null>(null)
 
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ['v2', 'leaderboard', tenComp.id],
@@ -42,8 +46,14 @@ export function PencaRankingPage() {
       )}
 
       {!isLoading && !error && entries.length > 0 && (
-        <LeaderboardView entries={entries} myId={user?.id} />
+        <LeaderboardView entries={entries} myId={user?.id} onSelect={setSelected} />
       )}
+
+      <UserScoreDetailModal
+        tenCompId={tenComp.id}
+        entry={selected}
+        onClose={() => setSelected(null)}
+      />
     </div>
   )
 }
