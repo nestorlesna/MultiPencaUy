@@ -3,18 +3,27 @@ import type { LeaderboardEntry } from '../../types'
 
 // Presentación pura del ranking (podio + mi posición + tabla completa).
 // Usada por la página v1 (global) y la v2 (scoped por Ten-Comp).
-export function LeaderboardView({ entries, myId }: { entries: LeaderboardEntry[]; myId?: string }) {
+// onSelect (opcional): hace clickeable cada fila/podio para abrir el detalle.
+export function LeaderboardView({
+  entries,
+  myId,
+  onSelect,
+}: {
+  entries: LeaderboardEntry[]
+  myId?: string
+  onSelect?: (entry: LeaderboardEntry) => void
+}) {
   const myEntry = entries.find(e => e.user_id === myId)
   const hasMore = entries.length > 3
 
   return (
     <>
-      <TopThree entries={entries.slice(0, 3)} myId={myId} />
+      <TopThree entries={entries.slice(0, 3)} myId={myId} onSelect={onSelect} />
 
       {myEntry && myEntry.rank > 3 && (
         <div className="mb-3">
           <p className="text-xs text-text-muted uppercase tracking-wide mb-1.5">Tu posición</p>
-          <LeaderboardRow entry={myEntry} isMe />
+          <LeaderboardRow entry={myEntry} isMe onSelect={onSelect} />
         </div>
       )}
 
@@ -22,7 +31,7 @@ export function LeaderboardView({ entries, myId }: { entries: LeaderboardEntry[]
         <div className="space-y-2">
           <p className="text-xs text-text-muted uppercase tracking-wide mb-1.5">Tabla completa</p>
           {entries.map(entry => (
-            <LeaderboardRow key={entry.user_id} entry={entry} isMe={entry.user_id === myId} />
+            <LeaderboardRow key={entry.user_id} entry={entry} isMe={entry.user_id === myId} onSelect={onSelect} />
           ))}
         </div>
       )}
@@ -49,9 +58,24 @@ export function Avatar({ entry }: { entry: LeaderboardEntry }) {
   )
 }
 
-function LeaderboardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+function LeaderboardRow({
+  entry,
+  isMe,
+  onSelect,
+}: {
+  entry: LeaderboardEntry
+  isMe: boolean
+  onSelect?: (entry: LeaderboardEntry) => void
+}) {
+  const clickable = !!onSelect
   return (
-    <div className={`card p-3 flex items-center gap-3 transition-colors ${isMe ? 'border-primary/40 bg-primary/5' : ''}`}>
+    <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onSelect!(entry) : undefined}
+      onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect!(entry) } } : undefined}
+      className={`card p-3 flex items-center gap-3 transition-colors ${isMe ? 'border-primary/40 bg-primary/5' : ''} ${clickable ? 'cursor-pointer hover:border-primary/40' : ''}`}
+    >
       <div className="flex-shrink-0 w-8 flex justify-center">
         <MedalOrRank rank={entry.rank} />
       </div>
@@ -80,36 +104,61 @@ function LeaderboardRow({ entry, isMe }: { entry: LeaderboardEntry; isMe: boolea
   )
 }
 
-function TopThree({ entries, myId }: { entries: LeaderboardEntry[]; myId?: string }) {
-  const [first, second, third] = entries
-
-  function PodiumCard({ entry, height }: { entry: LeaderboardEntry; height: string }) {
-    const isMe = entry.user_id === myId
-    return (
-      <div className="flex flex-col items-center gap-2">
-        <Avatar entry={entry} />
-        <p className={`text-xs font-medium text-center truncate max-w-[80px] ${isMe ? 'text-primary' : 'text-text-primary'}`}>
-          {entry.display_name}
-        </p>
-        <div
-          className={`w-full flex flex-col items-center justify-end rounded-t-lg ${height} ${
-            entry.rank === 1 ? 'bg-accent/20 border border-accent/30' : 'bg-surface-2 border border-border'
-          }`}
-        >
-          <MedalOrRank rank={entry.rank} />
-          <p className="text-sm font-bold text-primary tabular-nums pb-2">{entry.total_points}</p>
-        </div>
+function PodiumCard({
+  entry,
+  height,
+  myId,
+  onSelect,
+}: {
+  entry: LeaderboardEntry
+  height: string
+  myId?: string
+  onSelect?: (entry: LeaderboardEntry) => void
+}) {
+  const isMe = entry.user_id === myId
+  const clickable = !!onSelect
+  return (
+    <div
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? () => onSelect!(entry) : undefined}
+      onKeyDown={clickable ? e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect!(entry) } } : undefined}
+      className={`flex flex-col items-center gap-2 ${clickable ? 'cursor-pointer' : ''}`}
+    >
+      <Avatar entry={entry} />
+      <p className={`text-xs font-medium text-center truncate max-w-[80px] ${isMe ? 'text-primary' : 'text-text-primary'}`}>
+        {entry.display_name}
+      </p>
+      <div
+        className={`w-full flex flex-col items-center justify-end rounded-t-lg ${height} ${
+          entry.rank === 1 ? 'bg-accent/20 border border-accent/30' : 'bg-surface-2 border border-border'
+        }`}
+      >
+        <MedalOrRank rank={entry.rank} />
+        <p className="text-sm font-bold text-primary tabular-nums pb-2">{entry.total_points}</p>
       </div>
-    )
-  }
+    </div>
+  )
+}
+
+function TopThree({
+  entries,
+  myId,
+  onSelect,
+}: {
+  entries: LeaderboardEntry[]
+  myId?: string
+  onSelect?: (entry: LeaderboardEntry) => void
+}) {
+  const [first, second, third] = entries
 
   if (!first) return null
 
   return (
     <div className="grid grid-cols-3 gap-2 items-end mb-6">
-      {second ? <PodiumCard entry={second} height="h-20" /> : <div />}
-      <PodiumCard entry={first} height="h-28" />
-      {third ? <PodiumCard entry={third} height="h-16" /> : <div />}
+      {second ? <PodiumCard entry={second} height="h-20" myId={myId} onSelect={onSelect} /> : <div />}
+      <PodiumCard entry={first} height="h-28" myId={myId} onSelect={onSelect} />
+      {third ? <PodiumCard entry={third} height="h-16" myId={myId} onSelect={onSelect} /> : <div />}
     </div>
   )
 }
