@@ -46,7 +46,11 @@ export function PencaRankingPage() {
       )}
 
       {!isLoading && !error && entries.length > 0 && (
-        <LeaderboardView entries={entries} myId={user?.id} onSelect={setSelected} />
+        <LeaderboardView
+          entries={entries}
+          myId={user?.id}
+          onSelect={user ? setSelected : undefined}
+        />
       )}
 
       <UserScoreDetailModal

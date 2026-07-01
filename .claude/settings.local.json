@@ -57,7 +57,11 @@
       "Read(//c/DATOS/DESARROLLOS/React/**)",
       "PowerShell(npx eslint src/components/admin/CorreosTab.tsx src/services/v2/emailService.ts --ext ts,tsx 2>&1 | Select-Object -First 30)",
       "Bash(cp /tmp/diag.mjs ./diag.mjs)",
-      "Bash(node ./diag.mjs)"
+      "Bash(node ./diag.mjs)",
+      "Bash(cat .env)",
+      "Bash(cat .env.local)",
+      "Bash(cat .env.example)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('vercel.json','utf8'\\)\\); console.log\\('vercel.json: valid JSON'\\)\")"
     ]
   }
 }
