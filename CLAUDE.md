@@ -270,6 +270,18 @@ Como un partido pertenece a una sola competencia, agregar por `match_id` cubre l
 - *Liga de tabla única* (Apertura): se calcula en el frontend (`leagueStandingsService.fetchLeagueStandings`). Lista **todos** los equipos del fixture (arrancan en 0 aunque no hayan jugado), desempate PTS→DG→GF→**enfrentamiento directo**→nombre. No se persiste ni se "crea al clonar": es derivada en vivo.
 - *Series* (Intermedio): vista `group_standings` (una tabla por serie), ya lista todos los equipos en 0; desempate PTS→DG→GF→nombre (sin head-to-head).
 
+### Evolución del jugador en el ranking (gráficas, migración `108`)
+
+En el detalle del ranking (`UserScoreDetailModal`, se abre al tocar un usuario) hay dos **tabs**: "Detalle" (partidos con puntos + +Puntos, lo de siempre) y "Evolución" (`UserEvolutionTab`), con dos gráficas de línea SVG propias (sin librería):
+- **Puesto por día:** puesto en el ranking al cierre de cada día con partidos (eje Y invertido, #1 arriba).
+- **Puntos partido a partido:** acumulado desde 0; los **+Puntos (bonus)** se suman en el partido donde se resuelven (marcado en ámbar). Atribución: `empates_grupos`/`top_group_goals` → último partido de la fase de grupos; el resto (`podio`, `rango_goles`, `final_cero`, `top_scorer_team`) → último partido del torneo.
+
+Se materializan en `ten_comp_points_progress` (por partido) y `ten_comp_rank_progress` (por día), por Ten-Comp × usuario. Se regeneran enteras (borrar + reinsertar, set-based) vía `rebuild_progress(competition_id)`:
+- Automático (best-effort, no aborta la carga) dentro de `set_match_result` y `recalculate_all`.
+- Manual: botón **"Recargar evolución"** en `AdminResultadosV2Page` (para competencias ya jugadas, ej. Mundial).
+
+Lectura por RPC `SECURITY DEFINER` guardado por `is_approved_member`: `member_get_user_points_progress` / `member_get_user_rank_progress` (RLS de ambas tablas sin políticas de cliente; solo se leen por estos RPC). El día se calcula en `America/Montevideo`.
+
 ### Known gotcha: columna `sort_order` (antes `order`)
 
 En v2 la columna se renombró a `sort_order` para evitar el conflicto con el parámetro reservado `order` de PostgREST. Ya no es necesario el workaround de filtrado client-side que existía en `matchService.ts` de la v1.

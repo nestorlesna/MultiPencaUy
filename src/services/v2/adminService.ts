@@ -549,6 +549,22 @@ export async function populateKnockoutV2(competitionId: string): Promise<number>
   return data as number
 }
 
+export interface RebuildProgressResult {
+  points_rows: number
+  rank_rows: number
+}
+
+// Regenera las tablas de evolución (puntos por partido / puesto por día) de todas
+// las pencas de la competencia. Ya se dispara solo al cargar/recalcular; esto es
+// para forzarlo en competencias ya jugadas.
+export async function rebuildProgress(competitionId: string): Promise<RebuildProgressResult> {
+  const { data, error } = await supabase.rpc('rebuild_progress', {
+    p_competition_id: competitionId,
+  })
+  if (error) throw error
+  return data as RebuildProgressResult
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // CLONAR COMPETENCIA
 // ════════════════════════════════════════════════════════════════════════════

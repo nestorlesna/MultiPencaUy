@@ -18,6 +18,9 @@
 -- así el feature queda acotado a miembros aprobados en pencas públicas y privadas).
 -- ============================================================================
 
+-- Limpieza de policy heredada de la V1 (se corrió allá con otro nombre). Idempotente.
+DROP POLICY IF EXISTS "bonus_pts_active_read" ON bonus_points;
+
 CREATE OR REPLACE FUNCTION member_get_user_bonus_points(p_ten_comp UUID, p_user UUID)
 RETURNS TABLE(bonus_type TEXT, points_earned INT, detail JSONB, calculated_at TIMESTAMPTZ)
 LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
