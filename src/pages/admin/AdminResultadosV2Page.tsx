@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Navigate } from 'react-router-dom'
-import { Loader2, RefreshCw, Search, X } from 'lucide-react'
+import { Loader2, RefreshCw, LineChart, Search, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../hooks/useAuth'
 import { MatchCard } from '../../components/matches/MatchCard'
 import { ResultFormV2 } from '../../components/admin/ResultFormV2'
-import { fetchCompetitions, recalculateAllV2 } from '../../services/v2/adminService'
+import { fetchCompetitions, recalculateAllV2, rebuildProgress } from '../../services/v2/adminService'
 import { fetchMatches, fetchPhases, fetchGroups } from '../../services/v2/matchService'
 import type { MatchWithRelations } from '../../types/match'
 
@@ -66,6 +66,16 @@ export function AdminResultadosV2Page() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const rebuildMut = useMutation({
+    mutationFn: () => rebuildProgress(competitionId),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['v2', 'user-points-progress'] })
+      qc.invalidateQueries({ queryKey: ['v2', 'user-rank-progress'] })
+      toast.success(`Evolución regenerada · ${r.points_rows} filas de puntos · ${r.rank_rows} de ranking`)
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   if (loading) return null
   if (!user) return <Navigate to="/auth" replace />
   if (!canLoad) return <Navigate to="/" replace />
@@ -97,14 +107,25 @@ export function AdminResultadosV2Page() {
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-bold text-text-primary">Carga de resultados</h1>
-        <button
-          className="btn-secondary text-sm inline-flex items-center gap-1.5"
-          onClick={() => recalcMut.mutate()}
-          disabled={recalcMut.isPending || !competitionId}
-        >
-          <RefreshCw size={14} className={recalcMut.isPending ? 'animate-spin' : ''} />
-          {recalcMut.isPending ? 'Procesando...' : 'Recalcular todo'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="btn-ghost text-sm inline-flex items-center gap-1.5 border border-border"
+            onClick={() => rebuildMut.mutate()}
+            disabled={rebuildMut.isPending || !competitionId}
+            title="Borra y regenera las gráficas de evolución (puntos por partido y puesto por día)"
+          >
+            <LineChart size={14} className={rebuildMut.isPending ? 'animate-pulse' : ''} />
+            {rebuildMut.isPending ? 'Regenerando...' : 'Recargar evolución'}
+          </button>
+          <button
+            className="btn-secondary text-sm inline-flex items-center gap-1.5"
+            onClick={() => recalcMut.mutate()}
+            disabled={recalcMut.isPending || !competitionId}
+          >
+            <RefreshCw size={14} className={recalcMut.isPending ? 'animate-spin' : ''} />
+            {recalcMut.isPending ? 'Procesando...' : 'Recalcular todo'}
+          </button>
+        </div>
       </div>
 
       {/* Selector de competencia */}

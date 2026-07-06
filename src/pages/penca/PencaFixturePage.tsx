@@ -209,6 +209,7 @@ export function PencaFixturePage() {
         loading={summaryLoading}
         summary={summaryData?.summary ?? []}
         totalPredictions={summaryData?.totalPredictions ?? 0}
+        tenCompId={tenCompId}
       />
     </div>
   )

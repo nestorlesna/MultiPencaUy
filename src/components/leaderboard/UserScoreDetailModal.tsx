@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -5,6 +6,7 @@ import { Loader2, Target, Gift, Clock } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { TeamFlag } from '../ui/TeamFlag'
 import { Avatar } from './LeaderboardView'
+import { UserEvolutionTab } from './UserEvolutionTab'
 import {
   fetchUserScoredMatches,
   fetchUserBonusPoints,
@@ -98,6 +100,7 @@ export function UserScoreDetailModal({
   onClose: () => void
 }) {
   const userId = entry?.user_id
+  const [tab, setTab] = useState<'detalle' | 'evolucion'>('detalle')
 
   const { data: matches = [], isLoading: loadingMatches } = useQuery({
     queryKey: ['v2', 'user-scored-matches', tenCompId, userId],
@@ -134,13 +137,25 @@ export function UserScoreDetailModal({
             </div>
           </div>
 
-          {isLoading && (
+          {/* Tabs */}
+          <div className="flex gap-1 border-b border-border">
+            <TabBtn active={tab === 'detalle'} onClick={() => setTab('detalle')}>Detalle</TabBtn>
+            <TabBtn active={tab === 'evolucion'} onClick={() => setTab('evolucion')}>Evolución</TabBtn>
+          </div>
+
+          {tab === 'evolucion' && (
+            <div className="max-h-[60vh] overflow-y-auto pr-0.5">
+              <UserEvolutionTab tenCompId={tenCompId} userId={entry.user_id} />
+            </div>
+          )}
+
+          {tab === 'detalle' && isLoading && (
             <div className="flex justify-center py-10">
               <Loader2 className="animate-spin text-primary" size={24} />
             </div>
           )}
 
-          {!isLoading && (
+          {tab === 'detalle' && !isLoading && (
             <div className="max-h-[60vh] overflow-y-auto space-y-5 pr-0.5">
               {/* Partidos con punto */}
               <section>
@@ -180,5 +195,18 @@ export function UserScoreDetailModal({
         </div>
       )}
     </Modal>
+  )
+}
+
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+        active ? 'border-primary text-text-primary' : 'border-transparent text-text-muted hover:text-text-secondary'
+      }`}
+    >
+      {children}
+    </button>
   )
 }

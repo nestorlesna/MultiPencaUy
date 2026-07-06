@@ -135,3 +135,47 @@ export async function fetchUserBonusPoints(
   if (error) throw error
   return (data ?? []) as UserBonusPoint[]
 }
+
+// ── Evolución del jugador (gráficas del detalle del ranking) ───────────────────
+// Ambas salen de tablas materializadas (migración 108) vía RPC guardado por
+// is_approved_member. Se regeneran al cargar/recalcular resultados o con el botón
+// "Recargar evolución" del admin.
+
+// Puntos acumulados partido a partido (con el bonus sumado cuando se resuelve).
+export interface UserPointsProgressPoint {
+  match_number: number
+  match_points: number
+  bonus_added: number
+  cumulative_points: number
+}
+
+export async function fetchUserPointsProgress(
+  tenCompId: string,
+  userId: string
+): Promise<UserPointsProgressPoint[]> {
+  const { data, error } = await supabase.rpc('member_get_user_points_progress', {
+    p_ten_comp: tenCompId,
+    p_user: userId,
+  })
+  if (error) throw error
+  return (data ?? []) as UserPointsProgressPoint[]
+}
+
+// Puesto en el ranking por día.
+export interface UserRankProgressPoint {
+  day: string       // YYYY-MM-DD
+  points: number
+  rank: number
+}
+
+export async function fetchUserRankProgress(
+  tenCompId: string,
+  userId: string
+): Promise<UserRankProgressPoint[]> {
+  const { data, error } = await supabase.rpc('member_get_user_rank_progress', {
+    p_ten_comp: tenCompId,
+    p_user: userId,
+  })
+  if (error) throw error
+  return (data ?? []) as UserRankProgressPoint[]
+}

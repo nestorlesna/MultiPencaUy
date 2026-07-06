@@ -100,7 +100,85 @@ export async function fetchUserPredictionsMapV2(
 export interface PredictionSummaryV2 {
   home_score: number
   away_score: number
+  // Solo relevantes en knockout (Mundial 16avos en adelante): tiempo extra y
+  // ganador en penales. Null en fase de grupos / ligas, donde el agrupado
+  // colapsa naturalmente al marcador de 90'.
+  home_score_et: number | null
+  away_score_et: number | null
+  pk_winner_id: string | null
+  // Puntos que suma este desenlace con el scoring del Ten-Comp (0 si el partido
+  // aún no fue calculado). Igual para todas las apuestas del grupo, ya que
+  // comparten desenlace y scoring.
+  points_earned: number
   count: number
+}
+
+// Apuestas de los primeros N del ranking para un partido (con nombre y rank).
+// La RLS de `predictions` ya autoriza a un miembro aprobado a leer ajenas de
+// partidos comenzados, así que esto solo devuelve datos una vez arrancó el
+// partido. Incluye al usuario del top aunque no haya apostado (scores en null).
+export interface TopRankPrediction {
+  user_id: string
+  display_name: string
+  rank: number
+  home_score: number | null
+  away_score: number | null
+  home_score_et: number | null
+  away_score_et: number | null
+  pk_winner_id: string | null
+  points_earned: number | null
+}
+
+export async function fetchTopRankPredictions(
+  tenCompId: string,
+  matchId: string,
+  limit = 10
+): Promise<TopRankPrediction[]> {
+  const { data: top, error: topErr } = await supabase
+    .from('leaderboard')
+    .select('user_id, display_name, rank')
+    .eq('ten_comp_id', tenCompId)
+    .order('rank')
+    .limit(limit)
+  if (topErr) throw topErr
+
+  const rows = (top ?? []) as { user_id: string; display_name: string; rank: number }[]
+  if (rows.length === 0) return []
+
+  const { data: preds, error: predErr } = await supabase
+    .from('predictions')
+    .select('user_id, home_score, away_score, home_score_et, away_score_et, predicted_pk_winner_id, points_earned')
+    .eq('ten_comp_id', tenCompId)
+    .eq('match_id', matchId)
+    .in('user_id', rows.map(r => r.user_id))
+  if (predErr) throw predErr
+
+  const predMap = new Map(
+    ((preds ?? []) as Array<{
+      user_id: string
+      home_score: number
+      away_score: number
+      home_score_et: number | null
+      away_score_et: number | null
+      predicted_pk_winner_id: string | null
+      points_earned: number | null
+    }>).map(p => [p.user_id, p])
+  )
+
+  return rows.map(r => {
+    const p = predMap.get(r.user_id)
+    return {
+      user_id: r.user_id,
+      display_name: r.display_name,
+      rank: r.rank,
+      home_score: p?.home_score ?? null,
+      away_score: p?.away_score ?? null,
+      home_score_et: p?.home_score_et ?? null,
+      away_score_et: p?.away_score_et ?? null,
+      pk_winner_id: p?.predicted_pk_winner_id ?? null,
+      points_earned: p?.points_earned ?? null,
+    }
+  })
 }
 
 export async function fetchMatchPredictionsSummaryV2(
@@ -109,16 +187,37 @@ export async function fetchMatchPredictionsSummaryV2(
 ): Promise<{ summary: PredictionSummaryV2[]; totalPredictions: number }> {
   const { data, error } = await supabase
     .from('predictions')
-    .select('home_score, away_score')
+    .select('home_score, away_score, home_score_et, away_score_et, predicted_pk_winner_id, points_earned')
     .eq('ten_comp_id', tenCompId)
     .eq('match_id', matchId)
   if (error) throw error
 
   const map = new Map<string, PredictionSummaryV2>()
-  for (const row of (data ?? []) as Array<{ home_score: number; away_score: number }>) {
-    const key = `${row.home_score}-${row.away_score}`
-    if (!map.has(key)) map.set(key, { home_score: row.home_score, away_score: row.away_score, count: 0 })
-    map.get(key)!.count++
+  for (const row of (data ?? []) as Array<{
+    home_score: number
+    away_score: number
+    home_score_et: number | null
+    away_score_et: number | null
+    predicted_pk_winner_id: string | null
+    points_earned: number | null
+  }>) {
+    // La clave incluye ET y ganador de penales: dos apuestas con el mismo 90'
+    // pero distinto desenlace de knockout son filas distintas.
+    const key = `${row.home_score}-${row.away_score}-${row.home_score_et ?? ''}-${row.away_score_et ?? ''}-${row.predicted_pk_winner_id ?? ''}`
+    if (!map.has(key)) map.set(key, {
+      home_score: row.home_score,
+      away_score: row.away_score,
+      home_score_et: row.home_score_et,
+      away_score_et: row.away_score_et,
+      pk_winner_id: row.predicted_pk_winner_id,
+      points_earned: 0,
+      count: 0,
+    })
+    const entry = map.get(key)!
+    entry.count++
+    // Todas las filas del grupo suman lo mismo; tomamos el máximo por si alguna
+    // quedó sin recalcular (null → 0).
+    entry.points_earned = Math.max(entry.points_earned, row.points_earned ?? 0)
   }
 
   const summary = Array.from(map.values()).sort((a, b) => b.count - a.count)
