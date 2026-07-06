@@ -55,8 +55,8 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
   return (
     <Modal open={open} onClose={onClose} title="Apuestas" size="md">
       <div className="space-y-4">
-        {/* Resultado real (solo cuando el admin lo cargó) */}
-        {hasResult && (
+        {/* Cabezal: resultado si el admin lo cargó, si no solo los equipos */}
+        {hasResult ? (
           <div className="bg-primary/10 border border-primary/30 rounded-lg p-3 text-center">
             <p className="text-xs text-text-secondary mb-1">Resultado</p>
             <p className="text-base font-bold text-text-primary">
@@ -79,6 +79,13 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
                 )}
               </div>
             )}
+          </div>
+        ) : (
+          <div className="bg-surface-2 border border-border rounded-lg p-3 text-center">
+            <p className="text-xs text-text-secondary mb-1">Partido</p>
+            <p className="text-base font-bold text-text-primary">
+              {homeName} <span className="text-text-muted">–</span> {awayName}
+            </p>
           </div>
         )}
 
@@ -105,9 +112,9 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
                   <span>{totalPredictions} {totalPredictions === 1 ? 'apuesta' : 'apuestas'}</span>
                 </div>
 
-                {/* Grid 2 columnas con scroll */}
+                {/* Lista de 1 columna con scroll */}
                 <div className="overflow-y-auto max-h-[20vh] pr-1 -mr-1">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2">
                     {summary.map(item => {
                       const isExact = isExact90(item)
                       const pts = item.points_earned
