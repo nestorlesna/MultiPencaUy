@@ -455,23 +455,30 @@ function MatchBadge({ match, isLeague }: { match: MatchWithRelations; isLeague: 
   )
 }
 
+// Predicción guardada en el tab Predecir. Una fila por valor: 90' (siempre) y,
+// para knockout que el usuario llevó a alargue/penales, ET (30') y Pen (ganador).
 function ScoreDisplay({ pred, match }: { pred: PredictionV2; match: MatchWithRelations }) {
   const hasEt = pred.home_score_et !== null && pred.away_score_et !== null
   const pkWinner = pkWinnerAbbr(match, pred.predicted_pk_winner_id)
   return (
-    <span className="text-sm font-bold tabular-nums text-text-primary">
-      {pred.home_score}–{pred.away_score}
+    <div className="flex flex-col items-end gap-0.5 tabular-nums">
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] uppercase text-text-muted">90'</span>
+        <span className="text-sm font-bold text-text-primary">{pred.home_score}-{pred.away_score}</span>
+      </div>
       {hasEt && (
-        <span className="text-[10px] text-text-muted ml-1 font-normal">
-          (ET {pred.home_score_et}-{pred.away_score_et})
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] uppercase text-text-muted">ET</span>
+          <span className="text-[11px] text-text-secondary">{pred.home_score_et}-{pred.away_score_et}</span>
+        </div>
       )}
       {pkWinner && (
-        <span className="text-[10px] text-text-muted ml-1 font-normal">
-          (Pen {pkWinner})
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-[9px] uppercase text-text-muted">Pen</span>
+          <span className="text-[11px] font-semibold text-accent">{pkWinner}</span>
+        </div>
       )}
-    </span>
+    </div>
   )
 }
 
