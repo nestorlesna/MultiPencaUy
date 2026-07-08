@@ -29,6 +29,7 @@ export interface UserScoredMatch {
   pred_away: number
   pred_home_et: number | null
   pred_away_et: number | null
+  pred_pk_winner_id: string | null
   // Resultado real
   home_score_90: number | null
   away_score_90: number | null
@@ -43,6 +44,7 @@ export interface UserScoredMatch {
 
 const SCORED_SELECT = `
   id, match_id, home_score, away_score, home_score_et, away_score_et,
+  predicted_pk_winner_id,
   points_earned, created_at, updated_at,
   match:matches!inner(
     match_number, match_datetime,
@@ -60,6 +62,7 @@ interface RawScoredRow {
   away_score: number
   home_score_et: number | null
   away_score_et: number | null
+  predicted_pk_winner_id: string | null
   points_earned: number | null
   created_at: string
   updated_at: string | null
@@ -102,6 +105,7 @@ export async function fetchUserScoredMatches(
       pred_away: r.away_score,
       pred_home_et: r.home_score_et,
       pred_away_et: r.away_score_et,
+      pred_pk_winner_id: r.predicted_pk_winner_id ?? null,
       home_score_90: r.match?.home_score_90 ?? null,
       away_score_90: r.match?.away_score_90 ?? null,
       home_score_et: r.match?.home_score_et ?? null,

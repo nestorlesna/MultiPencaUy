@@ -217,13 +217,13 @@ function PredecirTab({
                         <div className="flex flex-col items-end gap-0.5">
                           <Lock size={12} className="text-text-muted" />
                           {pred
-                            ? <ScoreDisplay pred={pred} />
+                            ? <ScoreDisplay pred={pred} match={match} />
                             : <span className="text-[10px] text-text-muted italic">Sin pred.</span>
                           }
                         </div>
                       ) : pred ? (
                         <div className="flex flex-col items-end gap-0.5">
-                          <ScoreDisplay pred={pred} />
+                          <ScoreDisplay pred={pred} match={match} />
                           <span className="flex items-center gap-0.5 text-[10px] text-primary">
                             <Check size={9} /> Guardada
                           </span>
@@ -343,20 +343,7 @@ function HistorialTab({
                         <div className="flex-1 min-w-0">
                           <TeamFlag team={match.home_team} slotLabel={match.home_slot_label} size="sm" align="left" abbrev />
                         </div>
-                        <div className="flex-shrink-0 text-center">
-                          {match.home_score_90 !== null
-                            ? <p className="text-xs font-bold text-text-primary tabular-nums">
-                                {match.home_score_90} – {match.away_score_90}
-                              </p>
-                            : <p className="text-[10px] text-text-muted italic">Pendiente</p>
-                          }
-                          {pred
-                            ? <p className="text-[10px] text-text-muted">
-                                {pred.home_score}–{pred.away_score}
-                              </p>
-                            : <p className="text-[10px] text-text-muted italic">Sin pred.</p>
-                          }
-                        </div>
+                        <HistorialScore match={match} pred={pred} />
                         <div className="flex-1 min-w-0 flex justify-end">
                           <TeamFlag team={match.away_team} slotLabel={match.away_slot_label} size="sm" align="right" abbrev />
                         </div>
@@ -468,17 +455,102 @@ function MatchBadge({ match, isLeague }: { match: MatchWithRelations; isLeague: 
   )
 }
 
-function ScoreDisplay({ pred }: { pred: PredictionV2 }) {
+function ScoreDisplay({ pred, match }: { pred: PredictionV2; match: MatchWithRelations }) {
+  const hasEt = pred.home_score_et !== null && pred.away_score_et !== null
+  const pkWinner = pkWinnerAbbr(match, pred.predicted_pk_winner_id)
   return (
     <span className="text-sm font-bold tabular-nums text-text-primary">
       {pred.home_score}–{pred.away_score}
-      {pred.home_score_et !== null && (
-        <span className="text-[10px] text-text-muted ml-1">
-          (ET {pred.home_score_et}:{pred.away_score_et})
+      {hasEt && (
+        <span className="text-[10px] text-text-muted ml-1 font-normal">
+          (ET {pred.home_score_et}-{pred.away_score_et})
+        </span>
+      )}
+      {pkWinner && (
+        <span className="text-[10px] text-text-muted ml-1 font-normal">
+          (Pen {pkWinner})
         </span>
       )}
     </span>
   )
+}
+
+// Centro de una fila del Historial. Para partidos knockout con tiempo extra o
+// penales muestra una mini tabla Real / Tú con una fila por valor (90', ET, Pen);
+// para el resto conserva el layout simple (resultado real arriba, predicción abajo).
+function HistorialScore({ match, pred }: { match: MatchWithRelations; pred: PredictionV2 | null }) {
+  const has90 = match.home_score_90 !== null
+  const realEt = has90 && match.home_score_et !== null && match.away_score_et !== null
+  const realPk = has90 && match.home_score_pk !== null && match.away_score_pk !== null
+
+  // Sin ET ni penales (o partido pendiente): layout simple de siempre.
+  if (!realEt && !realPk) {
+    return (
+      <div className="flex-shrink-0 text-center">
+        {has90
+          ? <p className="text-xs font-bold text-text-primary tabular-nums">
+              {match.home_score_90} – {match.away_score_90}
+            </p>
+          : <p className="text-[10px] text-text-muted italic">Pendiente</p>
+        }
+        {pred
+          ? <p className="text-[10px] text-text-muted tabular-nums">{pred.home_score}–{pred.away_score}</p>
+          : <p className="text-[10px] text-text-muted italic">Sin pred.</p>
+        }
+      </div>
+    )
+  }
+
+  const realPkAbbr = realPk ? pkWinnerAbbr(match, match.winner_team_id ?? null) : null
+  const predEt = pred && pred.home_score_et !== null && pred.away_score_et !== null
+  const predPkAbbr = pred ? pkWinnerAbbr(match, pred.predicted_pk_winner_id) : null
+
+  return (
+    <div className="flex-shrink-0 grid grid-cols-[auto_auto_auto] gap-x-1.5 gap-y-0.5 items-center">
+      <span />
+      <span className="text-[8px] uppercase tracking-wide text-text-muted text-center">Real</span>
+      <span className="text-[8px] uppercase tracking-wide text-text-muted text-center">Tú</span>
+
+      {/* 90' */}
+      <span className="text-[9px] uppercase text-text-muted text-right">90'</span>
+      <span className="text-xs font-bold text-text-primary tabular-nums text-center">
+        {match.home_score_90}-{match.away_score_90}
+      </span>
+      <span className="text-[10px] text-text-muted tabular-nums text-center">
+        {pred ? `${pred.home_score}-${pred.away_score}` : '—'}
+      </span>
+
+      {/* Tiempo extra (30') */}
+      {realEt && (
+        <>
+          <span className="text-[9px] uppercase text-text-muted text-right">ET</span>
+          <span className="text-[10px] text-text-secondary tabular-nums text-center">
+            {match.home_score_et}-{match.away_score_et}
+          </span>
+          <span className="text-[10px] text-text-muted tabular-nums text-center">
+            {predEt ? `${pred!.home_score_et}-${pred!.away_score_et}` : '—'}
+          </span>
+        </>
+      )}
+
+      {/* Penales (ganador) */}
+      {realPk && (
+        <>
+          <span className="text-[9px] uppercase text-text-muted text-right">Pen</span>
+          <span className="text-[10px] text-accent font-semibold tabular-nums text-center">{realPkAbbr ?? '—'}</span>
+          <span className="text-[10px] text-text-muted tabular-nums text-center">{predPkAbbr ?? '—'}</span>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Abreviatura del equipo elegido como ganador en penales (o su slot label).
+function pkWinnerAbbr(match: MatchWithRelations, teamId: string | null): string | null {
+  if (!teamId) return null
+  if (teamId === match.home_team?.id) return match.home_team?.abbreviation ?? match.home_slot_label ?? 'L'
+  if (teamId === match.away_team?.id) return match.away_team?.abbreviation ?? match.away_slot_label ?? 'V'
+  return null
 }
 
 function PointsBadge({ points }: { points: number }) {

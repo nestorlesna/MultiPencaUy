@@ -29,19 +29,41 @@ function bonusLabel(type: string): { label: string; icon: string } {
   return BONUS_LABELS[type] ?? { label: type.replace(/_/g, ' '), icon: '⭐' }
 }
 
-// Marcador real, agregando ET / penales si los hay.
-function realScore(m: UserScoredMatch): string {
-  if (m.home_score_90 === null || m.away_score_90 === null) return '- : -'
-  let s = `${m.home_score_90} : ${m.away_score_90}`
-  if (m.home_score_et !== null && m.away_score_et !== null) s += ` (ET ${m.home_score_et}-${m.away_score_et})`
-  if (m.home_score_pk !== null && m.away_score_pk !== null) s += ` (pen ${m.home_score_pk}-${m.away_score_pk})`
-  return s
+function abbrOf(m: UserScoredMatch, teamId: string | null): string {
+  if (!teamId) return '?'
+  if (teamId === m.home_team?.id) return m.home_team?.abbreviation ?? '?'
+  if (teamId === m.away_team?.id) return m.away_team?.abbreviation ?? '?'
+  return '?'
 }
 
-function predScore(m: UserScoredMatch): string {
-  let s = `${m.pred_home} : ${m.pred_away}`
-  if (m.pred_home_et !== null && m.pred_away_et !== null) s += ` (ET ${m.pred_home_et}-${m.pred_away_et})`
-  return s
+// Marcador real en varias líneas: 90', ET y ganador en penales (por país).
+function realScoreLines(m: UserScoredMatch): string[] {
+  if (m.home_score_90 === null || m.away_score_90 === null) return ['- : -']
+  const lines = [`${m.home_score_90} : ${m.away_score_90}`]
+  if (m.home_score_et !== null && m.away_score_et !== null) lines.push(`ET ${m.home_score_et}-${m.away_score_et}`)
+  if (m.home_score_pk !== null && m.away_score_pk !== null) {
+    const winner = m.home_score_pk > m.away_score_pk ? m.home_team : m.away_team
+    lines.push(`Pen ${winner?.abbreviation ?? '?'}`)
+  }
+  return lines
+}
+
+// Apuesta en varias líneas: 90', ET y ganador en penales apostado (por país).
+function predScoreLines(m: UserScoredMatch): string[] {
+  const lines = [`${m.pred_home} : ${m.pred_away}`]
+  if (m.pred_home_et !== null && m.pred_away_et !== null) lines.push(`ET ${m.pred_home_et}-${m.pred_away_et}`)
+  if (m.pred_pk_winner_id) lines.push(`Pen ${abbrOf(m, m.pred_pk_winner_id)}`)
+  return lines
+}
+
+function ScoreLines({ lines }: { lines: string[] }) {
+  return (
+    <div className="text-text-primary font-semibold tabular-nums leading-tight space-y-0.5">
+      {lines.map((l, i) => (
+        <p key={i} className={i === 0 ? '' : 'text-[11px] text-text-secondary font-medium'}>{l}</p>
+      ))}
+    </div>
+  )
 }
 
 function MatchRow({ m }: { m: UserScoredMatch }) {
@@ -60,11 +82,11 @@ function MatchRow({ m }: { m: UserScoredMatch }) {
       <div className="grid grid-cols-2 gap-2 text-xs">
         <div className="rounded-lg bg-surface-2/40 px-2.5 py-1.5">
           <p className="text-text-muted text-[10px] uppercase tracking-wide">Apostó</p>
-          <p className="text-text-primary font-semibold tabular-nums">{predScore(m)}</p>
+          <ScoreLines lines={predScoreLines(m)} />
         </div>
         <div className="rounded-lg bg-surface-2/40 px-2.5 py-1.5">
           <p className="text-text-muted text-[10px] uppercase tracking-wide">Real</p>
-          <p className="text-text-primary font-semibold tabular-nums">{realScore(m)}</p>
+          <ScoreLines lines={realScoreLines(m)} />
         </div>
       </div>
       {m.predicted_at && (
