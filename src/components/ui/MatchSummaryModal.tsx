@@ -204,36 +204,66 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
             <p className="text-sm text-text-muted py-2">Todavía no hay ranking para este partido.</p>
           )}
 
-          {!topLoading && topPredictions.length > 0 && (
-            <div className="divide-y divide-border rounded-lg border border-border overflow-y-auto max-h-[20vh]">
-              {topPredictions.map(t => {
-                const predicted = t.home_score !== null && t.away_score !== null
-                const tEt = t.home_score_et !== null && t.away_score_et !== null
-                const tPk = pkAbbr(t.pk_winner_id)
-                const pts = t.points_earned ?? 0
-                return (
-                  <div key={t.user_id} className="flex items-center gap-2 px-3 py-2 bg-surface">
-                    <span className="w-5 text-[11px] font-bold text-text-muted tabular-nums text-right flex-shrink-0">
-                      {t.rank}
-                    </span>
-                    <span className="flex-1 text-sm text-text-primary truncate">{t.display_name}</span>
-                    {predicted ? (
-                      <span className="text-sm font-semibold tabular-nums text-text-primary whitespace-nowrap">
-                        {t.home_score} – {t.away_score}
-                        {tEt && <span className="text-[11px] text-text-secondary font-normal"> · ET {t.home_score_et}-{t.away_score_et}</span>}
-                        {tPk && <span className="text-[11px] text-accent font-normal"> · {tPk}</span>}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-text-muted italic whitespace-nowrap">Sin apuesta</span>
-                    )}
-                    {hasResult && pts > 0 && (
-                      <span className="badge-primary text-[10px] font-semibold flex-shrink-0">{pts}p</span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          {!topLoading && topPredictions.length > 0 && (() => {
+            // Columnas alineadas: rank · jugador · resultado · ET · Pen · puntos
+            const ROW = 'grid grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_2.5rem_2.25rem_2rem] items-center gap-1.5'
+            // ET/Pen solo son relevantes en knockout: si nadie del top 10 tiene
+            // esos datos, ocultamos esas columnas para no dejar una fila de puntos.
+            const anyEt = topPredictions.some(t => t.home_score_et !== null && t.away_score_et !== null)
+            const anyPk = topPredictions.some(t => pkAbbr(t.pk_winner_id) !== null)
+            return (
+              <div className="rounded-lg border border-border overflow-y-auto max-h-[24vh]">
+                {/* Encabezado de columnas */}
+                <div className={`${ROW} px-3 py-1.5 bg-surface-2 sticky top-0 text-[9px] font-semibold uppercase tracking-wide text-text-muted`}>
+                  <span></span>
+                  <span>Jugador</span>
+                  <span className="text-center">Res</span>
+                  <span className={`text-center ${anyEt ? '' : 'invisible'}`}>ET</span>
+                  <span className={`text-center ${anyPk ? '' : 'invisible'}`}>Pen</span>
+                  <span className="text-right">Pts</span>
+                </div>
+
+                <div className="divide-y divide-border">
+                  {topPredictions.map(t => {
+                    const predicted = t.home_score !== null && t.away_score !== null
+                    const tEt = t.home_score_et !== null && t.away_score_et !== null
+                    const tPk = pkAbbr(t.pk_winner_id)
+                    const pts = t.points_earned ?? 0
+                    return (
+                      <div key={t.user_id} className={`${ROW} px-3 py-2 bg-surface`}>
+                        <span className="text-[11px] font-bold text-text-muted tabular-nums text-right">
+                          {t.rank}
+                        </span>
+                        <span className="text-sm text-text-primary truncate">{t.display_name}</span>
+                        {predicted ? (
+                          <>
+                            <span className="text-center text-[13px] font-semibold tabular-nums text-text-primary whitespace-nowrap">
+                              {t.home_score}-{t.away_score}
+                            </span>
+                            <span className="text-center text-[11px] tabular-nums text-text-secondary whitespace-nowrap">
+                              {tEt ? `${t.home_score_et}-${t.away_score_et}` : '·'}
+                            </span>
+                            <span className="text-center text-[11px] font-semibold text-accent whitespace-nowrap">
+                              {tPk ?? '·'}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="col-span-3 text-center text-xs text-text-muted italic">Sin apuesta</span>
+                        )}
+                        <span className="text-right">
+                          {hasResult && pts > 0 ? (
+                            <span className="badge-primary text-[10px] font-semibold">{pts}p</span>
+                          ) : (
+                            <span className="text-[11px] text-text-muted">·</span>
+                          )}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </Modal>

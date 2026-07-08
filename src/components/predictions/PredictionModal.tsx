@@ -310,7 +310,7 @@ export function PredictionModal({ match, existing, onClose, tenCompId }: Props) 
         {isKnockout && (
           <div className={`transition-opacity ${showEt ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
             <p className="text-[11px] text-text-muted uppercase tracking-wide mb-3 text-center">
-              Tiempo extra {!showEt && '(solo si hay empate a 90)'}
+              Tiempo extra (30') {!showEt && '(solo si hay empate a 90)'}
             </p>
             <div className="flex items-center justify-between gap-2">
               <div className="flex-1 flex justify-center">
