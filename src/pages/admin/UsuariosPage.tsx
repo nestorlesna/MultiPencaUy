@@ -8,6 +8,7 @@ import { fetchAllUserEmails, resetUserPassword } from '../../services/v2/adminSe
 import { ResetPasswordModal } from '../../components/admin/ResetPasswordModal'
 import { useAuth } from '../../hooks/useAuth'
 import type { Profile } from '../../types'
+import { UserAvatar } from '../../components/ui/UserAvatar'
 
 export function UsuariosPage() {
   return (
@@ -153,18 +154,13 @@ interface UserRowProps {
 }
 
 function UserRow({ profile, email, isMe, resetting, onReset, onToggleActive, onToggleAdmin, onToggleLoader }: UserRowProps) {
-  const initials = (profile.display_name || profile.username)[0].toUpperCase()
-
   return (
     <div className="card p-4 flex items-center gap-3">
-      {/* Avatar */}
-      {profile.avatar_url ? (
-        <img src={profile.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
-      ) : (
-        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <span className="text-primary font-bold text-sm">{initials}</span>
-        </div>
-      )}
+      <UserAvatar
+        avatarUrl={profile.avatar_url}
+        seed={profile.id}
+        className="w-10 h-10 flex-shrink-0"
+      />
 
       {/* Info */}
       <div className="flex-1 min-w-0">
