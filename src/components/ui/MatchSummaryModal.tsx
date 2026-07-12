@@ -5,6 +5,8 @@ import { fetchTopRankPredictions } from '../../services/v2/predictionService'
 import type { MatchWithRelations } from '../../types/match'
 import type { PredictionSummaryV2 } from '../../services/v2/predictionService'
 
+const TOP_LIMIT = 100
+
 interface Props {
   open: boolean
   onClose: () => void
@@ -44,11 +46,11 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
   const isExact90 = (item: PredictionSummaryV2): boolean =>
     item.home_score === homeScore && item.away_score === awayScore
 
-  // Apuestas del top 10 del ranking. Visibles una vez que el partido comenzó
+  // Apuestas del top 100 del ranking. Visibles una vez que el partido comenzó
   // (la RLS libera las predicciones ajenas de partidos ya arrancados).
   const { data: topPredictions = [], isLoading: topLoading } = useQuery({
     queryKey: ['v2', 'top-rank-predictions', tenCompId, match?.id],
-    queryFn: () => fetchTopRankPredictions(tenCompId!, match!.id),
+    queryFn: () => fetchTopRankPredictions(tenCompId!, match!.id, TOP_LIMIT),
     enabled: open && !!tenCompId && !!match?.id,
   })
 
@@ -185,7 +187,7 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
         <div className="space-y-2">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-text-primary">
             <Trophy size={14} className="text-accent" />
-            <span>Apuestas del top 10</span>
+            <span>Apuestas del top {TOP_LIMIT}</span>
           </div>
 
           {!hasResult && (
@@ -205,21 +207,17 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
           )}
 
           {!topLoading && topPredictions.length > 0 && (() => {
-            // Columnas alineadas: rank · jugador · resultado · ET · Pen · puntos
-            const ROW = 'grid grid-cols-[1.25rem_minmax(0,1fr)_2.5rem_2.5rem_2.25rem_2rem] items-center gap-1.5'
-            // ET/Pen solo son relevantes en knockout: si nadie del top 10 tiene
-            // esos datos, ocultamos esas columnas para no dejar una fila de puntos.
-            const anyEt = topPredictions.some(t => t.home_score_et !== null && t.away_score_et !== null)
-            const anyPk = topPredictions.some(t => pkAbbr(t.pk_winner_id) !== null)
+            // Cada jugador ocupa dos líneas: el nombre completo arriba (así no se
+            // corta con "..." en celulares) y abajo las columnas alineadas contra
+            // el borde derecho: resultado · ET · Pen · puntos.
+            const COLS = 'grid grid-cols-[3rem_2.75rem_2.75rem_2.5rem] gap-2 justify-end w-max ml-auto items-center'
             return (
-              <div className="rounded-lg border border-border overflow-y-auto max-h-[24vh]">
+              <div className="rounded-lg border border-border overflow-y-auto max-h-[40vh]">
                 {/* Encabezado de columnas */}
-                <div className={`${ROW} px-3 py-1.5 bg-surface-2 sticky top-0 text-[9px] font-semibold uppercase tracking-wide text-text-muted`}>
-                  <span></span>
-                  <span>Jugador</span>
+                <div className={`${COLS} px-3 py-1.5 bg-surface-2 sticky top-0 text-[9px] font-semibold uppercase tracking-wide text-text-muted`}>
                   <span className="text-center">Res</span>
-                  <span className={`text-center ${anyEt ? '' : 'invisible'}`}>ET</span>
-                  <span className={`text-center ${anyPk ? '' : 'invisible'}`}>Pen</span>
+                  <span className="text-center">ET</span>
+                  <span className="text-center">Pen</span>
                   <span className="text-right">Pts</span>
                 </div>
 
@@ -230,33 +228,40 @@ export function MatchSummaryModal({ open, onClose, match, loading, summary, tota
                     const tPk = pkAbbr(t.pk_winner_id)
                     const pts = t.points_earned ?? 0
                     return (
-                      <div key={t.user_id} className={`${ROW} px-3 py-2 bg-surface`}>
-                        <span className="text-[11px] font-bold text-text-muted tabular-nums text-right">
-                          {t.rank}
-                        </span>
-                        <span className="text-sm text-text-primary truncate">{t.display_name}</span>
-                        {predicted ? (
-                          <>
-                            <span className="text-center text-[13px] font-semibold tabular-nums text-text-primary whitespace-nowrap">
-                              {t.home_score}-{t.away_score}
-                            </span>
-                            <span className="text-center text-[11px] tabular-nums text-text-secondary whitespace-nowrap">
-                              {tEt ? `${t.home_score_et}-${t.away_score_et}` : '·'}
-                            </span>
-                            <span className="text-center text-[11px] font-semibold text-accent whitespace-nowrap">
-                              {tPk ?? '·'}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="col-span-3 text-center text-xs text-text-muted italic">Sin apuesta</span>
-                        )}
-                        <span className="text-right">
-                          {hasResult && pts > 0 ? (
-                            <span className="badge-primary text-[10px] font-semibold">{pts}p</span>
+                      <div key={t.user_id} className="px-3 py-2 bg-surface">
+                        {/* Línea 1: puesto + nombre completo */}
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-[11px] font-bold text-text-muted tabular-nums">
+                            {t.rank}
+                          </span>
+                          <span className="text-sm text-text-primary break-words">{t.display_name}</span>
+                        </div>
+
+                        {/* Línea 2: columnas */}
+                        <div className={`${COLS} mt-0.5`}>
+                          {predicted ? (
+                            <>
+                              <span className="text-center text-[13px] font-semibold tabular-nums text-text-primary whitespace-nowrap">
+                                {t.home_score}-{t.away_score}
+                              </span>
+                              <span className="text-center text-[11px] tabular-nums text-text-secondary whitespace-nowrap">
+                                {tEt ? `${t.home_score_et}-${t.away_score_et}` : '·'}
+                              </span>
+                              <span className="text-center text-[11px] font-semibold text-accent whitespace-nowrap">
+                                {tPk ?? '·'}
+                              </span>
+                            </>
                           ) : (
-                            <span className="text-[11px] text-text-muted">·</span>
+                            <span className="col-span-3 text-center text-xs text-text-muted italic">Sin apuesta</span>
                           )}
-                        </span>
+                          <span className="text-right">
+                            {hasResult && pts > 0 ? (
+                              <span className="badge-primary text-[10px] font-semibold">{pts}p</span>
+                            ) : (
+                              <span className="text-[11px] text-text-muted">·</span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     )
                   })}
