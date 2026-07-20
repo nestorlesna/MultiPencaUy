@@ -1,5 +1,5 @@
 import { useState, useRef, type ChangeEvent } from 'react'
-import { Camera, Loader2, Check, Lock, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { Camera, Loader2, Check, Lock, Eye, EyeOff, Trash2, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
@@ -23,6 +23,8 @@ function PerfilContent() {
   const [updatingPass, setUpdatingPass] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [wantsNews, setWantsNews] = useState(profile?.wants_news ?? true)
+  const [savingNews, setSavingNews] = useState(false)
   // `undefined` = todavía no se tocó; `null` = el usuario lo quitó.
   const [avatarOverride, setAvatarOverride] = useState<string | null | undefined>(undefined)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -109,6 +111,20 @@ function PerfilContent() {
       setShowPass(false)
     }
     setUpdatingPass(false)
+  }
+
+  async function handleToggleNews(next: boolean) {
+    const previous = wantsNews
+    setWantsNews(next)
+    setSavingNews(true)
+    try {
+      await updateProfile(user!.id, { wants_news: next })
+      toast.success(next ? 'Vas a recibir novedades por email' : 'No vas a recibir novedades por email')
+    } catch {
+      setWantsNews(previous)
+      toast.error('No se pudo guardar la preferencia')
+    }
+    setSavingNews(false)
   }
 
   const avatarSrc = avatarOverride !== undefined ? avatarOverride : profile.avatar_url
@@ -289,6 +305,33 @@ function PerfilContent() {
             : <><Check size={15} /> Actualizar contraseña</>
           }
         </button>
+      </div>
+
+      {/* Preferencias de notificaciones */}
+      <div className="card p-6 mb-4">
+        <h2 className="text-sm font-semibold text-text-secondary mb-4 flex items-center gap-2">
+          <Bell size={14} /> Notificaciones
+        </h2>
+
+        <label className="flex items-center justify-between gap-4 cursor-pointer select-none">
+          <div>
+            <p className="text-sm text-text-primary">Novedades por email</p>
+            <p className="text-xs text-text-muted mt-0.5">
+              Recibí noticias y avisos de las pencas por correo.
+            </p>
+          </div>
+          <div className="relative flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={wantsNews}
+              onChange={e => handleToggleNews(e.target.checked)}
+              disabled={savingNews}
+              className="peer sr-only"
+            />
+            <div className="w-11 h-6 rounded-full bg-surface-2 border border-border peer-checked:bg-primary peer-checked:border-primary transition-colors peer-disabled:opacity-50" />
+            <div className="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+          </div>
+        </label>
       </div>
 
       {/* Estado de cuenta */}

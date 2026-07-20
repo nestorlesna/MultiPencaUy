@@ -140,6 +140,7 @@ export interface InvitableUser {
   id: string
   email: string
   display_name: string | null
+  wants_news: boolean
 }
 
 export async function fetchInvitableUsers(tenCompId: string): Promise<InvitableUser[]> {

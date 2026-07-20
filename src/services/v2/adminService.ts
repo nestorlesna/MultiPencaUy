@@ -365,12 +365,13 @@ export interface MemberRow {
   username: string | null
   display_name: string | null
   avatar_url: string | null
+  wants_news: boolean
 }
 
 export async function fetchMembers(tenCompId: string): Promise<MemberRow[]> {
   const { data, error } = await supabase
     .from('ten_comp_members')
-    .select('user_id, status, joined_at, profile:user_id ( username, display_name, avatar_url )')
+    .select('user_id, status, joined_at, profile:user_id ( username, display_name, avatar_url, wants_news )')
     .eq('ten_comp_id', tenCompId)
     .order('joined_at', { ascending: false })
   if (error) throw error
@@ -381,6 +382,7 @@ export async function fetchMembers(tenCompId: string): Promise<MemberRow[]> {
     username: r.profile?.username ?? null,
     display_name: r.profile?.display_name ?? null,
     avatar_url: r.profile?.avatar_url ?? null,
+    wants_news: r.profile?.wants_news ?? true,
   }))
 }
 

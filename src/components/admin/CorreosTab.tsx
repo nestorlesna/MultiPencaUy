@@ -74,6 +74,9 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
   }
   // Solo destinatarios con email conocido (miembros del ten-comp)
   const recipients = approved.filter(m => emailMap.has(m.user_id))
+  // Quiénes optaron por NO recibir novedades (por defecto se los excluye).
+  const optedOutMembers = new Set(members.filter(m => m.wants_news === false).map(m => m.user_id))
+  const optedOutInvitables = new Set(invitables.filter(u => u.wants_news === false).map(u => u.id))
 
   function baseEntry(uid: string): Omit<CreateEmailInput, 'subject' | 'body_html' | 'category'> {
     return {
@@ -102,6 +105,7 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
       {/* ── Sin predicciones ── */}
       <SinPrediccionesSection
         recipients={recipients}
+        optedOut={optedOutMembers}
         detailsCount={uid => emailMap.get(uid)?.predictions_count ?? 0}
         nameOf={nameOf}
         queue={queue}
@@ -117,6 +121,7 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
       {/* ── Ranking ── */}
       <RankingSection
         recipients={recipients}
+        optedOut={optedOutMembers}
         nameOf={nameOf}
         lbMap={lbMap}
         queue={queue}
@@ -136,6 +141,7 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
       {/* ── Resultado de partido ── */}
       <ResultadoSection
         recipients={recipients}
+        optedOut={optedOutMembers}
         nameOf={nameOf}
         matches={matches}
         queue={queue}
@@ -163,6 +169,7 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
       {/* ── Invitar usuarios registrados (otras pencas del mismo tenant) ── */}
       <InvitarRegistradosSection
         invitables={invitables}
+        optedOut={optedOutInvitables}
         queue={queue}
         onEnqueue={(users) => enqueueMut.mutate(users.map(u => ({
           tenant_id: tenantId,
@@ -196,6 +203,7 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
       {/* ── Recordatorio ── */}
       <RecordatorioSection
         recipients={recipients}
+        optedOut={optedOutMembers}
         nameOf={nameOf}
         matches={matches}
         queue={queue}
@@ -246,10 +254,11 @@ function Section({ icon: Icon, title, count, children, color = 'text-accent' }: 
   )
 }
 
-function Picker({ recipients, nameOf, disabledIds, selected, toggle, selectAll, clear, rightFor }: {
+function Picker({ recipients, nameOf, disabledIds, optedOutIds, selected, toggle, selectAll, clear, rightFor }: {
   recipients: Member[]
   nameOf: (uid: string) => string
   disabledIds: Set<string>
+  optedOutIds?: Set<string>
   selected: Set<string>
   toggle: (id: string) => void
   selectAll: () => void
@@ -273,6 +282,9 @@ function Picker({ recipients, nameOf, disabledIds, selected, toggle, selectAll, 
                 onChange={() => toggle(m.user_id)} className="accent-primary" />
               <span className="flex-1 min-w-0 text-sm text-text-primary truncate">{nameOf(m.user_id)}</span>
               {rightFor?.(m.user_id)}
+              {optedOutIds?.has(m.user_id) && (
+                <span className="badge bg-accent/15 text-accent text-[10px] flex-shrink-0">Sin novedades</span>
+              )}
               {inQueue && <span className="badge bg-border text-text-muted text-[10px]">En cola</span>}
             </label>
           )
@@ -294,6 +306,34 @@ function useSelection() {
   return { selected, setSelected, toggle, clear }
 }
 
+// Combina "en cola" con "optó por no recibir novedades" (cuando se respeta la
+// preferencia) para deshabilitar destinatarios. Por defecto se respeta; el admin
+// puede desmarcar para un correo importante que igual debe llegar a todos.
+function useRespectNews(queued: Set<string>, optedOut: Set<string>) {
+  const [respect, setRespect] = useState(true)
+  const disabled = new Set(queued)
+  if (respect) optedOut.forEach(id => disabled.add(id))
+  return { respect, setRespect, disabled }
+}
+
+function RespectNewsToggle({ respect, setRespect, excluded }: {
+  respect: boolean; setRespect: (v: boolean) => void; excluded: number
+}) {
+  if (excluded === 0) return null
+  return (
+    <label className="flex items-start gap-2 cursor-pointer select-none rounded-lg bg-surface-2 p-2.5">
+      <input type="checkbox" checked={respect} onChange={e => setRespect(e.target.checked)}
+        className="mt-0.5 accent-primary" />
+      <span className="text-xs text-text-secondary leading-snug">
+        Respetar la preferencia de novedades
+        {respect
+          ? <span className="text-text-muted"> · {excluded} {excluded === 1 ? 'destinatario excluido' : 'destinatarios excluidos'}</span>
+          : <span className="text-accent"> · desactivado, se incluye a quienes no quieren novedades</span>}
+      </span>
+    </label>
+  )
+}
+
 function EnqueueButton({ count, pending, onClick, label, icon: Icon = Mail }: {
   count: number; pending: boolean; onClick: () => void; label: string; icon?: typeof Mail
 }) {
@@ -306,35 +346,41 @@ function EnqueueButton({ count, pending, onClick, label, icon: Icon = Mail }: {
   )
 }
 
-function SinPrediccionesSection({ recipients, detailsCount, nameOf, queue, onEnqueue, pending }: {
-  recipients: Member[]; detailsCount: (uid: string) => number; nameOf: (uid: string) => string
+function SinPrediccionesSection({ recipients, optedOut, detailsCount, nameOf, queue, onEnqueue, pending }: {
+  recipients: Member[]; optedOut: Set<string>; detailsCount: (uid: string) => number; nameOf: (uid: string) => string
   queue: EmailQueueEntry[]; onEnqueue: (uids: string[]) => void; pending: boolean
 }) {
   const { selected, setSelected, toggle, clear } = useSelection()
   const list = recipients.filter(m => detailsCount(m.user_id) === 0)
   const queued = new Set(queue.filter(e => e.category === 'sin_predicciones').map(e => e.user_id!).filter(Boolean))
+  const { respect, setRespect, disabled } = useRespectNews(queued, optedOut)
+  const excluded = list.filter(m => optedOut.has(m.user_id)).length
   return (
     <Section icon={AlertTriangle} title="Sin predicciones" count={list.length}>
       <p className="text-xs text-text-muted">Miembros aprobados que no cargaron ningún pronóstico.</p>
-      <Picker recipients={list} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-        selectAll={() => setSelected(new Set(list.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
+      <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+      <Picker recipients={list} nameOf={nameOf} disabledIds={disabled} optedOutIds={optedOut} selected={selected} toggle={toggle}
+        selectAll={() => setSelected(new Set(list.filter(m => !disabled.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
       <EnqueueButton count={selected.size} pending={pending} label="Agregar a la cola"
         onClick={() => { onEnqueue([...selected]); clear() }} />
     </Section>
   )
 }
 
-function RankingSection({ recipients, nameOf, lbMap, queue, onEnqueue, pending }: {
-  recipients: Member[]; nameOf: (uid: string) => string; lbMap: Map<string, { rank: number; total_points: number }>
+function RankingSection({ recipients, optedOut, nameOf, lbMap, queue, onEnqueue, pending }: {
+  recipients: Member[]; optedOut: Set<string>; nameOf: (uid: string) => string; lbMap: Map<string, { rank: number; total_points: number }>
   queue: EmailQueueEntry[]; onEnqueue: (uids: string[]) => void; pending: boolean
 }) {
   const { selected, setSelected, toggle, clear } = useSelection()
   const queued = new Set(queue.filter(e => e.category === 'ranking').map(e => e.user_id!).filter(Boolean))
+  const { respect, setRespect, disabled } = useRespectNews(queued, optedOut)
+  const excluded = recipients.filter(m => optedOut.has(m.user_id)).length
   return (
     <Section icon={Trophy} title="Ranking actual" count={recipients.length}>
       <p className="text-xs text-text-muted">Envía a cada uno el top 5 y su posición actual.</p>
-      <Picker recipients={recipients} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-        selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear}
+      <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+      <Picker recipients={recipients} nameOf={nameOf} disabledIds={disabled} optedOutIds={optedOut} selected={selected} toggle={toggle}
+        selectAll={() => setSelected(new Set(recipients.filter(m => !disabled.has(m.user_id)).map(m => m.user_id)))} clear={clear}
         rightFor={uid => {
           const e = lbMap.get(uid)
           return e ? <span className="text-[11px] text-accent flex-shrink-0">#{e.rank} · {e.total_points} pts</span> : null
@@ -345,8 +391,8 @@ function RankingSection({ recipients, nameOf, lbMap, queue, onEnqueue, pending }
   )
 }
 
-function ResultadoSection({ recipients, nameOf, matches, queue, onEnqueue, pending }: {
-  recipients: Member[]; nameOf: (uid: string) => string; matches: MatchWithRelations[]
+function ResultadoSection({ recipients, optedOut, nameOf, matches, queue, onEnqueue, pending }: {
+  recipients: Member[]; optedOut: Set<string>; nameOf: (uid: string) => string; matches: MatchWithRelations[]
   queue: EmailQueueEntry[]
   onEnqueue: (match: MatchWithRelations, uids: string[]) => void; pending: boolean
 }) {
@@ -358,6 +404,8 @@ function ResultadoSection({ recipients, nameOf, matches, queue, onEnqueue, pendi
   const queued = new Set(
     queue.filter(e => match && e.category === `partido_M${match.match_number}`).map(e => e.user_id!).filter(Boolean)
   )
+  const { respect, setRespect, disabled } = useRespectNews(queued, optedOut)
+  const excluded = recipients.filter(m => optedOut.has(m.user_id)).length
   const mlabel = (m: MatchWithRelations) =>
     `P${m.match_number}: ${m.home_team?.name ?? '?'} ${m.home_score_90 ?? ''}-${m.away_score_90 ?? ''} ${m.away_team?.name ?? '?'}`
 
@@ -370,8 +418,9 @@ function ResultadoSection({ recipients, nameOf, matches, queue, onEnqueue, pendi
       </select>
       {match && (
         <>
-          <Picker recipients={recipients} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-            selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
+          <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+          <Picker recipients={recipients} nameOf={nameOf} disabledIds={disabled} optedOutIds={optedOut} selected={selected} toggle={toggle}
+            selectAll={() => setSelected(new Set(recipients.filter(m => !disabled.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
           <EnqueueButton count={selected.size} pending={pending} label="Agregar a la cola"
             onClick={() => { onEnqueue(match, [...selected]); clear() }} />
         </>
@@ -382,12 +431,14 @@ function ResultadoSection({ recipients, nameOf, matches, queue, onEnqueue, pendi
 
 // Invitar a usuarios YA registrados que juegan en otras pencas del mismo tenant
 // (p. ej. los de la competencia A) a esta penca. Cada uno tiene user_id.
-function InvitarRegistradosSection({ invitables, queue, onEnqueue, pending }: {
-  invitables: InvitableUser[]; queue: EmailQueueEntry[]
+function InvitarRegistradosSection({ invitables, optedOut, queue, onEnqueue, pending }: {
+  invitables: InvitableUser[]; optedOut: Set<string>; queue: EmailQueueEntry[]
   onEnqueue: (users: InvitableUser[]) => void; pending: boolean
 }) {
   const { selected, setSelected, toggle, clear } = useSelection()
   const queued = new Set(queue.filter(e => e.category === 'invitacion').map(e => e.user_id!).filter(Boolean))
+  const { respect, setRespect, disabled } = useRespectNews(queued, optedOut)
+  const excluded = invitables.filter(u => optedOut.has(u.id)).length
   const nameOf = (uid: string) => {
     const u = invitables.find(x => x.id === uid)
     return u?.display_name || u?.email || 'Usuario'
@@ -399,8 +450,9 @@ function InvitarRegistradosSection({ invitables, queue, onEnqueue, pending }: {
         Jugadores de otras pencas de esta empresa que todavía no están en esta. Les llega
         el enlace para sumarse (con el código de acceso si la penca es privada).
       </p>
-      <Picker recipients={recipients} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-        selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear}
+      <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+      <Picker recipients={recipients} nameOf={nameOf} disabledIds={disabled} optedOutIds={optedOut} selected={selected} toggle={toggle}
+        selectAll={() => setSelected(new Set(recipients.filter(m => !disabled.has(m.user_id)).map(m => m.user_id)))} clear={clear}
         rightFor={uid => {
           const u = invitables.find(x => x.id === uid)
           return u?.display_name ? <span className="text-[11px] text-text-muted flex-shrink-0 truncate max-w-[160px]">{u.email}</span> : null
@@ -445,8 +497,8 @@ function InvitarExternosSection({ joinCode, onEnqueue, pending }: {
   )
 }
 
-function RecordatorioSection({ recipients, nameOf, matches, queue, onEnqueue, pending }: {
-  recipients: Member[]; nameOf: (uid: string) => string; matches: MatchWithRelations[]
+function RecordatorioSection({ recipients, optedOut, nameOf, matches, queue, onEnqueue, pending }: {
+  recipients: Member[]; optedOut: Set<string>; nameOf: (uid: string) => string; matches: MatchWithRelations[]
   queue: EmailQueueEntry[]; onEnqueue: (uids: string[], proximos: { home: string; away: string; datetime: string }[]) => void; pending: boolean
 }) {
   const { selected, setSelected, toggle, clear } = useSelection()
@@ -457,6 +509,8 @@ function RecordatorioSection({ recipients, nameOf, matches, queue, onEnqueue, pe
     .slice(0, 5)
     .map(m => ({ home: m.home_team?.name ?? '?', away: m.away_team?.name ?? '?', datetime: m.match_datetime }))
   const queued = new Set(queue.filter(e => e.category === 'recordatorio').map(e => e.user_id!).filter(Boolean))
+  const { respect, setRespect, disabled } = useRespectNews(queued, optedOut)
+  const excluded = recipients.filter(m => optedOut.has(m.user_id)).length
   return (
     <Section icon={Bell} title="Recordatorio de predicción" count={recipients.length} color="text-primary">
       <p className="text-xs text-text-muted">
@@ -466,8 +520,9 @@ function RecordatorioSection({ recipients, nameOf, matches, queue, onEnqueue, pe
       </p>
       {proximos.length > 0 && (
         <>
-          <Picker recipients={recipients} nameOf={nameOf} disabledIds={queued} selected={selected} toggle={toggle}
-            selectAll={() => setSelected(new Set(recipients.filter(m => !queued.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
+          <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+          <Picker recipients={recipients} nameOf={nameOf} disabledIds={disabled} optedOutIds={optedOut} selected={selected} toggle={toggle}
+            selectAll={() => setSelected(new Set(recipients.filter(m => !disabled.has(m.user_id)).map(m => m.user_id)))} clear={clear} />
           <EnqueueButton count={selected.size} pending={pending} label="Agregar a la cola" icon={Bell}
             onClick={() => { onEnqueue([...selected], proximos); clear() }} />
         </>

@@ -14,7 +14,7 @@ export interface GroupPredictionsDetail {
 
 export async function updateProfile(
   userId: string,
-  data: Partial<Pick<Profile, 'display_name' | 'avatar_url'>>
+  data: Partial<Pick<Profile, 'display_name' | 'avatar_url' | 'wants_news'>>
 ) {
     const { error } = await supabase.from('profiles').update(data).eq('id', userId)
   if (error) throw error

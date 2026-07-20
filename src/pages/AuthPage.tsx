@@ -79,6 +79,7 @@ export function AuthPage() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [username, setUsername] = useState('')
+  const [wantsNews, setWantsNews] = useState(true)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const captchaRef = useRef<TurnstileInstance>(null)
   const [pendingConfirmEmail, setPendingConfirmEmail] = useState<string | null>(null)
@@ -166,7 +167,7 @@ export function AuthPage() {
       email,
       password,
       options: {
-        data: { username, full_name: displayName },
+        data: { username, full_name: displayName, wants_news: wantsNews },
         captchaToken: token,
         emailRedirectTo: window.location.origin,
       },
@@ -177,7 +178,7 @@ export function AuthPage() {
       resetCaptcha()
     } else {
       setSuccess('¡Registro exitoso! Revisá tu correo para confirmar la cuenta y ya podés empezar a predecir.')
-      setEmail(''); setPassword(''); setDisplayName(''); setUsername('')
+      setEmail(''); setPassword(''); setDisplayName(''); setUsername(''); setWantsNews(true)
       resetCaptcha()
     }
     setLoading(false)
@@ -454,6 +455,20 @@ export function AuthPage() {
                   </button>
                 </div>
               </div>
+            )}
+
+            {tab === 'register' && (
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={wantsNews}
+                  onChange={e => setWantsNews(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-border bg-surface accent-primary cursor-pointer"
+                />
+                <span className="text-xs text-text-secondary leading-snug">
+                  Quiero recibir novedades y noticias por email. Podés cambiarlo cuando quieras desde tu perfil.
+                </span>
+              </label>
             )}
 
             <button
