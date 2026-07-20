@@ -17,6 +17,7 @@ import { CorreosTab } from '../../components/admin/CorreosTab'
 import { ResetPasswordModal } from '../../components/admin/ResetPasswordModal'
 import type { EmailBrand } from '../../services/v2/emailService'
 import type { MenuConfig, TenCompScoring } from '../../types/tenant'
+import { UserAvatar } from '../../components/ui/UserAvatar'
 
 type Tab = 'miembros' | 'puntaje' | 'correos' | 'menu' | 'config'
 
@@ -218,9 +219,7 @@ function MemberItem({ member, onReset, resetting, children }: {
   return (
     <div className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg bg-surface-2">
       <div className="flex items-center gap-2 min-w-0">
-        {member.avatar_url
-          ? <img src={member.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-          : <div className="w-7 h-7 rounded-full bg-border flex items-center justify-center text-[11px] text-text-muted">{name[0]?.toUpperCase()}</div>}
+        <UserAvatar avatarUrl={member.avatar_url} seed={member.user_id} className="w-7 h-7 flex-shrink-0" />
         <div className="min-w-0">
           <p className="text-sm text-text-primary truncate">{name}</p>
           {member.username && <p className="text-[11px] text-text-muted truncate">@{member.username}</p>}

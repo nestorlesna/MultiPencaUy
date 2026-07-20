@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <clipPath id="a01"><circle cx="50" cy="50" r="50"/></clipPath>
+  <g clip-path="url(#a01)">
+    <rect width="100" height="100" fill="#fff"/>
+    <g fill="#0038A8">
+      <rect y="11.1" width="100" height="11.1"/>
+      <rect y="33.3" width="100" height="11.1"/>
+      <rect y="55.6" width="100" height="11.1"/>
+      <rect y="77.8" width="100" height="11.1"/>
+    </g>
+    <rect width="44.4" height="44.4" fill="#fff"/>
+    <g transform="translate(22.2 22.2)">
+      <g stroke="#FCD116" stroke-width="2.4" stroke-linecap="round">
+        <path d="M0-15V-9M0 15V9M-15 0H-9M15 0H9M-10.6-10.6l4.2 4.2M10.6 10.6l-4.2-4.2M10.6-10.6l-4.2 4.2M-10.6 10.6l4.2-4.2"/>
+      </g>
+      <circle r="7" fill="#FCD116"/>
+    </g>
+  </g>
+</svg>

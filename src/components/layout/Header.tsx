@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useTenCompState } from '../../contexts/TenCompContext'
 import { visibleMenuItems } from '../tencomp/menu'
 import { CompetitionSwitcher } from './CompetitionSwitcher'
+import { UserAvatar } from '../ui/UserAvatar'
 
 export function Header() {
   const { user, profile, signOut, isAdmin, isLoader, isSuperAdmin } = useAuth()
@@ -30,10 +31,6 @@ export function Header() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
-
-  const initials = profile
-    ? (profile.display_name || profile.username)[0].toUpperCase()
-    : 'U'
 
   // Menú dinámico de la competencia activa. Los ítems de participación solo se
   // muestran si el usuario es miembro (pending/approved) de esta penca.
@@ -66,13 +63,7 @@ export function Header() {
                   onClick={() => setUserMenuOpen(o => !o)}
                   className="flex items-center gap-2 btn-ghost py-1 px-2"
                 >
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-                      {initials}
-                    </div>
-                  )}
+                  <UserAvatar avatarUrl={profile?.avatar_url} seed={user.id} className="w-7 h-7" />
                   <span className="hidden sm:block text-sm">{profile?.display_name || profile?.username}</span>
                 </button>
 

@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../../hooks/useAuth'
 import { useTenComp } from '../../contexts/TenCompContext'
 import { Modal } from '../../components/ui/Modal'
+import { UserAvatar } from '../../components/ui/UserAvatar'
 import {
   fetchSubgrupoDetailV2, fetchSubgrupoRankingV2, fetchSubgrupoMemberIdsV2,
   fetchTenCompMemberOptionsV2, addMemberToSubgrupoV2, removeMemberFromSubgrupoV2,
@@ -114,11 +115,7 @@ export function PencaSubgrupoDetailPage() {
               <span className={`w-6 text-center font-bold tabular-nums text-sm flex-shrink-0 ${
                 idx === 0 ? 'text-accent' : 'text-text-muted'
               }`}>{r.subgrupo_rank}</span>
-              {r.avatar_url
-                ? <img src={r.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                : <div className="w-8 h-8 rounded-full bg-border flex items-center justify-center text-xs text-text-muted flex-shrink-0">
-                    {(r.display_name || r.username || '?')[0]?.toUpperCase()}
-                  </div>}
+              <UserAvatar avatarUrl={r.avatar_url} seed={r.user_id} className="w-8 h-8 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-text-primary truncate">{r.display_name || r.username}</p>
                 <p className="text-[11px] text-text-muted">{r.exact_scores} exactos · {r.predictions_count} jugadas</p>

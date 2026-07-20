@@ -1,5 +1,6 @@
 import { Target, Check } from 'lucide-react'
 import type { LeaderboardEntry } from '../../types'
+import { UserAvatar } from '../ui/UserAvatar'
 
 // Presentación pura del ranking (podio + mi posición + tabla completa).
 // Usada por la página v1 (global) y la v2 (scoped por Ten-Comp).
@@ -47,14 +48,12 @@ export function MedalOrRank({ rank }: { rank: number }) {
 }
 
 export function Avatar({ entry }: { entry: LeaderboardEntry }) {
-  const initials = (entry.display_name || entry.username)[0].toUpperCase()
-  if (entry.avatar_url) {
-    return <img src={entry.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
-  }
   return (
-    <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-      <span className="text-primary font-bold text-sm">{initials}</span>
-    </div>
+    <UserAvatar
+      avatarUrl={entry.avatar_url}
+      seed={entry.user_id}
+      className="w-9 h-9 flex-shrink-0"
+    />
   )
 }
 

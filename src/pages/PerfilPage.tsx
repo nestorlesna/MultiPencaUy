@@ -1,10 +1,11 @@
 import { useState, useRef, type ChangeEvent } from 'react'
-import { Camera, Loader2, Check, Lock, Eye, EyeOff } from 'lucide-react'
+import { Camera, Loader2, Check, Lock, Eye, EyeOff, Trash2, Bell } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../hooks/useAuth'
 import { updateProfile, uploadAvatar } from '../services/profileService'
 import { RequireAuth } from '../components/auth/AuthGuard'
+import { PRESET_AVATAR_GROUPS, resolveAvatarUrl } from '../utils/avatars'
 
 export function PerfilPage() {
   return (
@@ -22,12 +23,14 @@ function PerfilContent() {
   const [updatingPass, setUpdatingPass] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [wantsNews, setWantsNews] = useState(profile?.wants_news ?? true)
+  const [savingNews, setSavingNews] = useState(false)
+  // `undefined` = todavía no se tocó; `null` = el usuario lo quitó.
+  const [avatarOverride, setAvatarOverride] = useState<string | null | undefined>(undefined)
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (authLoading || !profile || !user) return null
 
-  const initials = (profile.display_name || profile.username)[0].toUpperCase()
 
   async function handleSave() {
     if (!displayName.trim()) return
@@ -41,25 +44,56 @@ function PerfilContent() {
     setSaving(false)
   }
 
+  // Guarda el avatar y refresca la sesión: useAuth no comparte estado entre
+  // componentes, así que sin esto el Header seguiría mostrando el anterior.
+  async function saveAvatar(url: string | null) {
+    await updateProfile(user!.id, { avatar_url: url })
+    setAvatarOverride(url)
+    await supabase.auth.refreshSession()
+  }
+
   async function handleAvatarChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
     // Preview local
     const reader = new FileReader()
-    reader.onload = ev => setAvatarPreview(ev.target?.result as string)
+    reader.onload = ev => setAvatarOverride(ev.target?.result as string)
     reader.readAsDataURL(file)
 
     setUploadingAvatar(true)
     try {
       const url = await uploadAvatar(user!.id, file)
-      await updateProfile(user!.id, { avatar_url: url })
+      await saveAvatar(url)
       toast.success('Avatar actualizado')
     } catch {
-      setAvatarPreview(null)
+      setAvatarOverride(undefined)
       toast.error('Error al subir la imagen. Máximo 2 MB.')
     }
     setUploadingAvatar(false)
+  }
+
+  async function handlePickPreset(url: string) {
+    const previous = avatarOverride
+    setAvatarOverride(url)
+    try {
+      await saveAvatar(url)
+    } catch {
+      setAvatarOverride(previous)
+      toast.error('No se pudo guardar el avatar')
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    const previous = avatarOverride
+    setAvatarOverride(null)
+    try {
+      await saveAvatar(null)
+      toast.success('Avatar quitado')
+    } catch {
+      setAvatarOverride(previous)
+      toast.error('No se pudo quitar el avatar')
+    }
   }
 
   async function handleUpdatePassword() {
@@ -79,7 +113,21 @@ function PerfilContent() {
     setUpdatingPass(false)
   }
 
-  const avatarSrc = avatarPreview ?? profile.avatar_url
+  async function handleToggleNews(next: boolean) {
+    const previous = wantsNews
+    setWantsNews(next)
+    setSavingNews(true)
+    try {
+      await updateProfile(user!.id, { wants_news: next })
+      toast.success(next ? 'Vas a recibir novedades por email' : 'No vas a recibir novedades por email')
+    } catch {
+      setWantsNews(previous)
+      toast.error('No se pudo guardar la preferencia')
+    }
+    setSavingNews(false)
+  }
+
+  const avatarSrc = avatarOverride !== undefined ? avatarOverride : profile.avatar_url
 
   return (
     <div className="max-w-md mx-auto">
@@ -89,17 +137,11 @@ function PerfilContent() {
       <div className="card p-6 mb-4">
         <div className="flex items-center gap-5">
           <div className="relative flex-shrink-0">
-            {avatarSrc ? (
-              <img
-                src={avatarSrc}
-                alt="Avatar"
-                className="w-20 h-20 rounded-full object-cover border-2 border-border"
-              />
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center border-2 border-border">
-                <span className="text-2xl font-bold text-primary">{initials}</span>
-              </div>
-            )}
+            <img
+              src={resolveAvatarUrl(avatarSrc, user.id)}
+              alt="Avatar"
+              className="w-20 h-20 rounded-full object-cover border-2 border-border"
+            />
 
             {/* Botón cambiar avatar */}
             <button
@@ -132,6 +174,48 @@ function PerfilContent() {
         <p className="text-xs text-text-muted mt-3">
           Formatos: JPG, PNG, WEBP · Máximo 2 MB
         </p>
+      </div>
+
+      {/* Avatares por defecto */}
+      <div className="card p-6 mb-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-text-secondary">Elegí un avatar</h2>
+          {avatarSrc && (
+            <button
+              onClick={handleRemoveAvatar}
+              className="text-xs text-text-muted hover:text-text-secondary flex items-center gap-1.5"
+            >
+              <Trash2 size={13} /> Quitar
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-5">
+          {PRESET_AVATAR_GROUPS.map(({ group, avatars }) => (
+            <div key={group}>
+              <p className="text-[11px] uppercase tracking-wider text-text-muted mb-2">{group}</p>
+              <div className="grid grid-cols-6 gap-2.5">
+                {avatars.map(av => {
+                  const selected = avatarSrc === av.url
+                  return (
+                    <button
+                      key={av.id}
+                      onClick={() => handlePickPreset(av.url)}
+                      title={av.label}
+                      aria-label={av.label}
+                      aria-pressed={selected}
+                      className={`relative aspect-square rounded-full overflow-hidden transition-transform hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-surface' : ''
+                      }`}
+                    >
+                      <img src={av.url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Datos editables */}
@@ -221,6 +305,33 @@ function PerfilContent() {
             : <><Check size={15} /> Actualizar contraseña</>
           }
         </button>
+      </div>
+
+      {/* Preferencias de notificaciones */}
+      <div className="card p-6 mb-4">
+        <h2 className="text-sm font-semibold text-text-secondary mb-4 flex items-center gap-2">
+          <Bell size={14} /> Notificaciones
+        </h2>
+
+        <label className="flex items-center justify-between gap-4 cursor-pointer select-none">
+          <div>
+            <p className="text-sm text-text-primary">Novedades por email</p>
+            <p className="text-xs text-text-muted mt-0.5">
+              Recibí noticias y avisos de las pencas por correo.
+            </p>
+          </div>
+          <div className="relative flex-shrink-0">
+            <input
+              type="checkbox"
+              checked={wantsNews}
+              onChange={e => handleToggleNews(e.target.checked)}
+              disabled={savingNews}
+              className="peer sr-only"
+            />
+            <div className="w-11 h-6 rounded-full bg-surface-2 border border-border peer-checked:bg-primary peer-checked:border-primary transition-colors peer-disabled:opacity-50" />
+            <div className="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+          </div>
+        </label>
       </div>
 
       {/* Estado de cuenta */}

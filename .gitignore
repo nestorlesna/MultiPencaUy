@@ -38,3 +38,5 @@ Datos/backup*.sql
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

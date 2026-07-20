@@ -4,6 +4,7 @@ import { Loader2, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react'
 import { RequireAdmin } from '../../components/auth/AuthGuard'
 import { fetchAuditLog, fetchAuditUsers } from '../../services/auditService'
 import type { AuditEntry, AuditFilters } from '../../services/auditService'
+import { UserAvatar } from '../../components/ui/UserAvatar'
 
 const PAGE_SIZE = 50
 
@@ -76,8 +77,6 @@ function MatchLabel({ entry }: { entry: AuditEntry }) {
 
 // ── Fila de audit ─────────────────────────────────────────────────────────────
 function AuditRow({ entry }: { entry: AuditEntry }) {
-  const initials = (entry.user.display_name || entry.user.username)[0].toUpperCase()
-
   return (
     <tr className="border-b border-border hover:bg-surface-2/50 transition-colors">
       {/* Fecha UTC */}
@@ -90,13 +89,11 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
       {/* Usuario */}
       <td className="px-3 py-2.5">
         <div className="flex items-center gap-2">
-          {entry.user.avatar_url ? (
-            <img src={entry.user.avatar_url} className="w-6 h-6 rounded-full object-cover flex-shrink-0" alt="" />
-          ) : (
-            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-[9px] font-bold text-primary">{initials}</span>
-            </div>
-          )}
+          <UserAvatar
+            avatarUrl={entry.user.avatar_url}
+            seed={entry.user.id}
+            className="w-6 h-6 flex-shrink-0"
+          />
           <div className="min-w-0">
             <p className="text-xs font-medium text-text-primary truncate max-w-[100px]">
               {entry.user.display_name}

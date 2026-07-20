@@ -12,6 +12,7 @@ import {
   type MuroMessage,
 } from '../../services/v2/muroService'
 import { formatRelativeTime } from '../../utils/formatters'
+import { UserAvatar } from '../ui/UserAvatar'
 
 const COOLDOWN_SECONDS = 30
 
@@ -155,16 +156,13 @@ function MuroRow({
   canDelete: boolean
   onDelete: () => void
 }) {
-  const initials = (m.display_name || '?')[0].toUpperCase()
   return (
     <div className="flex items-start gap-2.5 group">
-      {m.avatar_url ? (
-        <img src={m.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 mt-0.5" />
-      ) : (
-        <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <span className="text-primary font-bold text-[11px]">{initials}</span>
-        </div>
-      )}
+      <UserAvatar
+        avatarUrl={m.avatar_url}
+        seed={m.user_id}
+        className="w-7 h-7 flex-shrink-0 mt-0.5"
+      />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-semibold text-text-primary truncate">{m.display_name}</span>

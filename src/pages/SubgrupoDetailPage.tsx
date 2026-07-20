@@ -15,6 +15,7 @@ import {
   toggleSubgrupoActive,
 } from '../services/subgrupoService'
 import { Modal } from '../components/ui/Modal'
+import { UserAvatar } from '../components/ui/UserAvatar'
 
 function MedalOrRank({ rank }: { rank: number }) {
   if (rank === 1) return <span className="text-accent text-lg">🥇</span>
@@ -27,21 +28,13 @@ function MedalOrRank({ rank }: { rank: number }) {
   )
 }
 
-function Avatar({ entry }: { entry: { display_name: string; avatar_url: string | null } }) {
-  const initials = (entry.display_name || '?')[0].toUpperCase()
-  if (entry.avatar_url) {
-    return (
-      <img
-        src={entry.avatar_url}
-        alt=""
-        className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-      />
-    )
-  }
+function Avatar({ entry }: { entry: { user_id?: string; display_name: string; avatar_url: string | null } }) {
   return (
-    <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-      <span className="text-primary font-bold text-sm">{initials}</span>
-    </div>
+    <UserAvatar
+      avatarUrl={entry.avatar_url}
+      seed={entry.user_id ?? entry.display_name}
+      className="w-9 h-9 flex-shrink-0"
+    />
   )
 }
 

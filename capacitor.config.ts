@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.pencales.app',
-  appName: 'PencaLes 2026',
+  appName: 'PencaLes',
   webDir: 'dist',
   server: {
     androidScheme: 'https',
