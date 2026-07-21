@@ -120,18 +120,75 @@ días antes del día D. Se usa la base de staging (sus datos actuales son descar
    psql "$STG_DB_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;
                           GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
                           GRANT ALL ON SCHEMA public TO postgres;"
-   # Restaurar el public de prod (del backup 1a)
+   ```
+2. **Restaurar `auth.users`/`auth.identities` de prod ANTES que `public`** (orden crítico,
+   ver nota de abajo):
+   ```bash
+   psql "$STG_DB_URL" -c "TRUNCATE auth.users CASCADE;"
+   psql "$STG_DB_URL" -v ON_ERROR_STOP=1 -f prod_auth.sql   # el dump plano del punto 1a #3
+   ```
+   No usar `pg_restore --disable-triggers` para esto: en Supabase el rol `postgres` del pooler
+   no es *owner* de las tablas de `auth` (son de `supabase_auth_admin`) y el flag falla con
+   `must be owner of table`. Tampoco hace falta: el trigger `handle_new_user` sobre
+   `auth.users` tiene `ON CONFLICT (id) DO NOTHING`, así que reinsertar usuarios no rompe nada.
+3. **Restaurar `public` de prod** (recién ahora, con `auth.users` ya correcto):
+   ```bash
    pg_restore -d "$STG_DB_URL" -n public --no-owner prod_full.dump
    ```
-   > `auth.users` de staging no coincide con prod → algunas FKs de `profiles`/`predictions`
-   > pueden fallar al restaurar. Para el ensayo, restaurar también `auth` de prod en staging
-   > (`pg_restore -d "$STG_DB_URL" --data-only -n auth prod_full.dump` tras truncar
-   > `auth.users` de staging), o usar `--disable-triggers`. Si esto se complica, alternativa
-   > válida: crear un **proyecto Supabase free descartable** solo para el ensayo.
-2. Ejecutar **toda la Fase 4** (transformación) contra `STG_DB_URL`.
-3. Ejecutar **toda la Fase 5** (validación). La query del leaderboard debe dar **0 filas**.
-4. Apuntar la app local (`npm run dev` con `.env` → staging) y hacer el smoke test de la Fase 5c.
-5. Anotar tiempos y cualquier desvío: eso corrige este documento antes del día D.
+   > **Por qué el orden importa:** `profiles.id` tiene FK a `auth.users(id)`. Si se restaura
+   > `public` primero (con el `auth.users` viejo de staging todavía puesto), el `COPY` de
+   > `profiles` viola la FK y falla — y como `pg_restore` no frena por defecto ante un error,
+   > sigue con el resto de las tablas en silencio. El resultado es un restore que *parece*
+   > haber terminado bien pero deja `profiles`, `predictions`, `bonus_predictions`,
+   > `bonus_points`, `subgrupos`, `subgrupo_members`, `predictions_audit` y
+   > `bonus_predictions_audit` completamente vacías (cualquier tabla con FK directa o indirecta
+   > a `profiles`/`auth.users`). Se nota recién en la Fase 5 (o antes, si se corre
+   > `SELECT count(*) FROM legacy.<tabla>` tabla por tabla). Restaurando `auth` primero, este
+   > problema no existe.
+   >
+   > Si aun así hace falta recuperar tablas que quedaron vacías por haber restaurado en el
+   > orden incorrecto: volver a dumpearlas de prod en texto plano y data-only
+   > (`pg_dump --data-only -t public.<tabla> ...`), reemplazar `public.` por `legacy.` en las
+   > líneas `COPY` del archivo resultante, y antes de cargarlo desactivar los triggers de v1
+   > que hacen inserts sin qualificar contra tablas de auditoría (`legacy.trg_audit_predictions`,
+   > `legacy.trg_audit_bonus_predictions`, `legacy.trg_subgrupo_limit` — fallan con
+   > `relation "..." does not exist` porque el dump de `pg_dump` fuerza `search_path=''`).
+   > Truncar la tabla destino antes de cada reintento: `COPY` no es idempotente como los
+   > `INSERT ... ON CONFLICT`.
+   >
+   > Si `mover_a_legacy.sql` ya corrió y las tablas están en `legacy`, correr `90_migrate_from_v1.sql`
+   > de nuevo después de arreglar `legacy` — es idempotente, rellena lo que faltaba sin duplicar.
+4. Si staging ya tuvo alguna vez v2 corriendo (como el par dev de MultiPenca), `02_rls.sql`
+   puede fallar en las policies de Storage del bucket **`logos`** (`logos_public_read`, etc.)
+   con `policy ... already exists` — `mover_a_legacy.sql` solo dropea las de `avatars` (nombres
+   v1), no las de `logos`. Si pasa: `DROP POLICY IF EXISTS "logos_*" ON storage.objects;` para
+   las 4 policies y correr manualmente el resto de `02_rls.sql` desde esa sección. **No debería
+   pasar en prod real** (nunca corrió v2 ahí), pero vale la pena verificarlo el día D por las dudas.
+5. Ejecutar **toda la Fase 4** (transformación) contra `STG_DB_URL`.
+6. Ejecutar **toda la Fase 5** (validación). La query del leaderboard debe dar **0 filas**.
+   `rebuild_progress`/`recalculate_all` están guardadas por `can_load_results()`, que depende de
+   `auth.uid()` — inexistente si se llama por `psql` directo (sin JWT real de la API). Para
+   simularlo en la misma sesión/transacción:
+   ```sql
+   BEGIN;
+   SELECT set_config('request.jwt.claims', '{"sub":"<uuid-de-un-super-admin>"}', true);
+   SELECT rebuild_progress('22222222-2222-4222-8222-222222222222');
+   COMMIT;
+   ```
+   (tiene que ir en un único `BEGIN...COMMIT`: el `true` de `set_config` = "solo esta
+   transacción", se pierde si cada sentencia se manda por separado, como hace `psql -f` por
+   default sin transacción explícita).
+7. Apuntar la app local (`npm run dev` con `.env` → staging) y hacer el smoke test de la Fase 5c.
+8. Anotar tiempos y cualquier desvío: eso corrige este documento antes del día D.
+
+> **Nota:** todo lo de los puntos 2–4 es exclusivo del *ensayo* — existe porque staging es un
+> proyecto Supabase distinto al de prod y hay que traerle `auth.users` a mano para simular la
+> migración. En el día D real (Fase 4, sobre `PROD_DB_URL`) la migración es **in-place sobre la
+> misma base**: `auth.users` de prod nunca se toca ni se restaura desde ningún lado, así que la
+> condición de carrera del punto 3 no puede darse — `mover_a_legacy.sql` solo mueve metadata
+> (`ALTER TABLE ... SET SCHEMA`), no copia filas. El punto 6 (simular JWT para `psql` directo)
+> sí aplica igual en prod, si se corre `rebuild_progress`/`recalculate_all` a mano por consola
+> en vez de desde el panel admin.
 
 ---
 
