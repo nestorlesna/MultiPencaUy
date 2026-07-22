@@ -3,7 +3,7 @@ import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 
 const VERSION_URL =
-  'https://raw.githubusercontent.com/nestorlesna/Penca2026uy/main/version.json'
+  'https://raw.githubusercontent.com/nestorlesna/MultiPencaUy/main/version.json'
 
 export interface VersionInfo {
   version_code: number

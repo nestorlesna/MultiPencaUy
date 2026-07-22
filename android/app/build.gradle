@@ -34,7 +34,7 @@ android {
     }
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "Penca2026uy.apk"
+            outputFileName = "PencaLes.apk"
         }
     }
 }

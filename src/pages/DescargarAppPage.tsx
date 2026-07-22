@@ -1,11 +1,22 @@
+import { useEffect, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Download, ArrowLeft } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-const APK_URL = 'https://github.com/nestorlesna/Penca2026uy/releases/download/v1.1.0/Penca2026uy.apk'
+// "latest" apunta siempre al asset de la última release — no depende de hardcodear la versión.
+const APK_URL = 'https://github.com/nestorlesna/MultiPencaUy/releases/latest/download/PencaLes.apk'
+const VERSION_URL = 'https://raw.githubusercontent.com/nestorlesna/MultiPencaUy/main/version.json'
 
 export function DescargarAppPage() {
   const apkUrl = APK_URL
+  const [versionName, setVersionName] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(VERSION_URL)
+      .then(res => res.json())
+      .then(data => setVersionName(data.version_name))
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="max-w-md mx-auto">
@@ -15,7 +26,7 @@ export function DescargarAppPage() {
 
       <h1 className="text-xl font-bold text-text-primary mb-2">Descargar aplicación</h1>
       <p className="text-sm text-text-secondary mb-6">
-        Escaneá el código QR con tu celular para descargar la app de PencaLes 2026.
+        Escaneá el código QR con tu celular para descargar la app de PencaLes.
       </p>
 
       <div className="card p-8 flex flex-col items-center">
@@ -38,9 +49,11 @@ export function DescargarAppPage() {
           Descargar APK
         </a>
 
-        <p className="text-xs text-text-muted mt-4">
-          Versión 1.1.0
-        </p>
+        {versionName && (
+          <p className="text-xs text-text-muted mt-4">
+            Versión {versionName}
+          </p>
+        )}
       </div>
     </div>
   )

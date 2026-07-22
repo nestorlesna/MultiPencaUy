@@ -9,8 +9,8 @@ param(
 $GradlePath   = "android/app/build.gradle"
 $VersionJson  = "version.json"
 $GithubOwner  = "nestorlesna"
-$GithubRepo   = "Penca2026uy"
-$ApkName      = "Penca2026uy.apk"
+$GithubRepo   = "MultiPencaUy"
+$ApkName      = "PencaLes.apk"
 $Utf8NoBom    = [System.Text.UTF8Encoding]::new($false)
 
 function Assert-LastCommand {

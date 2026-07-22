@@ -71,8 +71,8 @@ jobs:
       - name: Find and rename APK
         id: find_apk
         run: |
-          APK_DEST="android/app/build/outputs/apk/release/Penca2026uy.apk"
-          APK_SOURCE=$(find android/app/build/outputs/apk/release/ -name "*.apk" ! -name "Penca2026uy.apk" | head -1)
+          APK_DEST="android/app/build/outputs/apk/release/PencaLes.apk"
+          APK_SOURCE=$(find android/app/build/outputs/apk/release/ -name "*.apk" ! -name "PencaLes.apk" | head -1)
           if [ -n "$APK_SOURCE" ]; then
             mv "$APK_SOURCE" "$APK_DEST"
           fi
@@ -85,12 +85,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "Penca 2026 v${{ steps.version.outputs.version }}"
+          name: "PencaLes v${{ steps.version.outputs.version }}"
           tag_name: ${{ github.ref_name }}
           body: |
             ## Instalación
 
-            1. Descargar **Penca2026uy.apk** desde los assets de abajo
+            1. Descargar **PencaLes.apk** desde los assets de abajo
             2. En Android: **Configuración → Seguridad → Instalar apps desconocidas** (activar para el navegador/explorador usado)
             3. Abrir el APK descargado e instalar
             4. Si ya tenías la app instalada, se actualizará automáticamente manteniendo tus datos
