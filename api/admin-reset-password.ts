@@ -48,21 +48,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adminTenantIds = (roles ?? []).map(r => r.tenant_id)
 
     if (adminTenantIds.length > 0) {
-      // El target debe ser miembro de alguna penca de esos tenants
-      const { data: tenComps } = await supabaseAdmin
-        .from('ten_comps')
-        .select('id')
-        .in('tenant_id', adminTenantIds)
-      const tenCompIds = (tenComps ?? []).map(t => t.id)
+      // ── Guard anti-escalación de privilegios ──
+      // Un tenant-admin NUNCA puede resetear a una cuenta con privilegio igual o
+      // mayor: ni a un super-admin de la plataforma, ni a un admin de OTRO tenant
+      // que él no administre (aunque compartan una penca pública). Solo el
+      // super-admin puede resetear a otros admins.
+      const { data: targetProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('is_super_admin')
+        .eq('id', targetId)
+        .single()
 
-      if (tenCompIds.length > 0) {
-        const { data: membership } = await supabaseAdmin
-          .from('ten_comp_members')
-          .select('user_id')
-          .eq('user_id', targetId)
-          .in('ten_comp_id', tenCompIds)
-          .limit(1)
-        authorized = (membership ?? []).length > 0
+      const { data: targetRoles } = await supabaseAdmin
+        .from('tenant_roles')
+        .select('tenant_id')
+        .eq('user_id', targetId)
+        .eq('role', 'admin')
+      const targetAdminsElsewhere = (targetRoles ?? [])
+        .some(r => !adminTenantIds.includes(r.tenant_id))
+
+      if (!targetProfile?.is_super_admin && !targetAdminsElsewhere) {
+        // El target debe ser miembro de alguna penca de esos tenants
+        const { data: tenComps } = await supabaseAdmin
+          .from('ten_comps')
+          .select('id')
+          .in('tenant_id', adminTenantIds)
+        const tenCompIds = (tenComps ?? []).map(t => t.id)
+
+        if (tenCompIds.length > 0) {
+          const { data: membership } = await supabaseAdmin
+            .from('ten_comp_members')
+            .select('user_id')
+            .eq('user_id', targetId)
+            .in('ten_comp_id', tenCompIds)
+            .limit(1)
+          authorized = (membership ?? []).length > 0
+        }
       }
     }
   }
