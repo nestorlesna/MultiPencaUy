@@ -116,7 +116,7 @@ export async function fetchUserScoredMatches(
       home_team: r.match?.home_team ?? null,
       away_team: r.match?.away_team ?? null,
     }))
-    .sort((a, b) => a.match_number - b.match_number)
+    .sort((a, b) => b.match_datetime.localeCompare(a.match_datetime))
 }
 
 // Bonus GANADOS (+Puntos) de un usuario. Vía RPC SECURITY DEFINER porque la RLS
