@@ -7,8 +7,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { MatchCard } from '../../components/matches/MatchCard'
 import { ResultFormV2 } from '../../components/admin/ResultFormV2'
 import { fetchCompetitions, recalculateAllV2, rebuildProgress } from '../../services/v2/adminService'
-import { fetchMatches, fetchPhases, fetchGroups } from '../../services/v2/matchService'
+import { fetchMatches, fetchPhases, fetchGroups, fetchRounds } from '../../services/v2/matchService'
 import type { MatchWithRelations } from '../../types/match'
+import { matchDateKey, formatMatchDayFull } from '../../utils/datetime'
 
 export function AdminResultadosV2Page() {
   const { user, loading, isSuperAdmin, tenantRoles } = useAuth()
@@ -16,6 +17,7 @@ export function AdminResultadosV2Page() {
   const [competitionId, setCompetitionId] = useState<string>('')
   const [phaseOrder, setPhaseOrder] = useState<number>(1)
   const [groupName, setGroupName] = useState<string | undefined>(undefined)
+  const [roundNumber, setRoundNumber] = useState<number | undefined>(undefined)
   const [loadFilter, setLoadFilter] = useState<'all' | 'pending' | 'loaded'>('all')
   const [teamQuery, setTeamQuery] = useState('')
   const [selected, setSelected] = useState<MatchWithRelations | null>(null)
@@ -49,9 +51,16 @@ export function AdminResultadosV2Page() {
     enabled: !!competitionId,
   })
 
+  const { data: rounds = [] } = useQuery({
+    queryKey: ['v2', 'rounds', competitionId],
+    queryFn: () => fetchRounds(competitionId),
+    enabled: !!competitionId,
+    staleTime: 1000 * 60 * 10,
+  })
+
   const { data: matches = [], isLoading } = useQuery({
-    queryKey: ['v2', 'admin-matches', competitionId, phaseOrder, groupName],
-    queryFn: () => fetchMatches(competitionId, { phaseOrder, groupName }),
+    queryKey: ['v2', 'admin-matches', competitionId, phaseOrder, groupName, roundNumber],
+    queryFn: () => fetchMatches(competitionId, { phaseOrder, groupName, roundNumber }),
     enabled: !!competitionId,
   })
 
@@ -81,6 +90,7 @@ export function AdminResultadosV2Page() {
   if (!canLoad) return <Navigate to="/" replace />
 
   const showGroupFilter = phaseOrder === 1 && groups.length > 0
+  const showRoundFilter = phaseOrder === 1 && rounds.length > 0
 
   // Filtro por estado de carga (cargado = resultado guardado / status finished)
   // y por nombre/abreviatura de equipo (local o visitante, sin distinguir
@@ -102,6 +112,21 @@ export function AdminResultadosV2Page() {
   )
   const pendingCount = matches.filter(m => m.status !== 'finished').length
   const loadedCount = matches.length - pendingCount
+
+  // Agrupa por día: una sección por fecha con su encabezado (igual que en Fixture).
+  const groupedByDate = (() => {
+    const map = new Map<string, MatchWithRelations[]>()
+    for (const m of visibleMatches) {
+      const key = matchDateKey(m.match_datetime)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(m)
+    }
+    return Array.from(map.entries()).map(([dateKey, items]) => ({
+      dateKey,
+      label: formatMatchDayFull(items[0].match_datetime),
+      matches: items,
+    }))
+  })()
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
@@ -133,7 +158,7 @@ export function AdminResultadosV2Page() {
         <label className="block text-xs text-text-secondary mb-1.5">Competencia</label>
         <select
           value={competitionId}
-          onChange={e => { setCompetitionId(e.target.value); setPhaseOrder(1); setGroupName(undefined) }}
+          onChange={e => { setCompetitionId(e.target.value); setPhaseOrder(1); setGroupName(undefined); setRoundNumber(undefined) }}
           className="input w-full"
         >
           {competitions.length === 0 && <option value="">No hay competencias</option>}
@@ -149,7 +174,7 @@ export function AdminResultadosV2Page() {
           {phases.map(p => (
             <button
               key={p.id}
-              onClick={() => { setPhaseOrder(p.order); setGroupName(undefined) }}
+              onClick={() => { setPhaseOrder(p.order); setGroupName(undefined); setRoundNumber(undefined) }}
               className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 phaseOrder === p.order ? 'bg-primary text-white' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
               }`}
@@ -180,6 +205,31 @@ export function AdminResultadosV2Page() {
               }`}
             >
               {g.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filtro por fecha/jornada (ligas por fechas). Envuelto en varias filas si hay muchas. */}
+      {showRoundFilter && (
+        <div className="flex flex-wrap gap-1 pb-1">
+          <button
+            onClick={() => setRoundNumber(undefined)}
+            className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              roundNumber === undefined ? 'bg-accent text-white' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Todas
+          </button>
+          {rounds.map(r => (
+            <button
+              key={r}
+              onClick={() => setRoundNumber(roundNumber === r ? undefined : r)}
+              className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                roundNumber === r ? 'bg-accent text-white' : 'bg-surface-2 text-text-secondary hover:text-text-primary'
+              }`}
+            >
+              F{r}
             </button>
           ))}
         </div>
@@ -242,24 +292,33 @@ export function AdminResultadosV2Page() {
               : loadFilter === 'pending' ? 'No quedan partidos pendientes en esta fase.' : 'No hay partidos cargados en esta fase.'}
           </p>
         )}
-        {visibleMatches.map(match => (
-          <MatchCard
-            key={match.id}
-            match={match}
-            footerContent={
-              <div className="flex items-center justify-between gap-2">
-                {match.status === 'finished'
-                  ? <span className="badge bg-success/20 text-success text-[10px]">Finalizado</span>
-                  : <span className="badge bg-border text-text-muted text-[10px]">Pendiente</span>}
-                <button
-                  className="btn-primary text-[11px] px-3 py-1"
-                  onClick={(e) => { e.stopPropagation(); setSelected(match) }}
-                >
-                  Resultado
-                </button>
-              </div>
-            }
-          />
+        {groupedByDate.map(({ dateKey, label, matches: dayMatches }) => (
+          <section key={dateKey}>
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-2 capitalize">
+              {label}
+            </h2>
+            <div className="space-y-3">
+              {dayMatches.map(match => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  footerContent={
+                    <div className="flex items-center justify-between gap-2">
+                      {match.status === 'finished'
+                        ? <span className="badge bg-success/20 text-success text-[10px]">Finalizado</span>
+                        : <span className="badge bg-border text-text-muted text-[10px]">Pendiente</span>}
+                      <button
+                        className="btn-primary text-[11px] px-3 py-1"
+                        onClick={(e) => { e.stopPropagation(); setSelected(match) }}
+                      >
+                        Resultado
+                      </button>
+                    </div>
+                  }
+                />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
 
