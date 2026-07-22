@@ -24,8 +24,8 @@ KEY/
 *.keystore
 *.jks
 
-# Backups de base de datos y temporales de Office — nunca commitear
-Datos/backup*.sql
+# Backups de base de datos, docs de credenciales y temporales de Office — nunca commitear
+Datos/
 ~$*
 
 # Editor directories and files
