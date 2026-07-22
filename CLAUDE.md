@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Proyecto
 
 **PencaLes 2.0** — Plataforma SaaS multi-tenant de pencas deportivas.
-Plan completo de desarrollo y migración: [`docs/PLAN_MULTITENANT.md`](docs/PLAN_MULTITENANT.md)
+Plan completo de desarrollo: [`docs/PLAN_MULTITENANT.md`](docs/PLAN_MULTITENANT.md) · Migración a producción ejecutada: [`docs/MIGRA_PENCA_MULTIP.md`](docs/MIGRA_PENCA_MULTIP.md)
 
-**Estado actual:** Desarrollo de v2 (multi-tenant). La v1 (PencaLes 2026, Mundial FIFA) corre en producción hasta 19/07/2026; su schema SQL está en `supabase/legacy/` solo como referencia.
+**Estado actual:** **En producción** (migrado 21/07/2026, in-place sobre el Supabase/Vercel de Penca2026). v1 quedó congelada en el schema `legacy` de la misma base (no en un proyecto aparte); `supabase/legacy/` en el repo sigue siendo solo referencia histórica de scripts. `docs/MIGRACION_V1_A_V2.md` (ETL a proyecto nuevo) quedó obsoleto — la migración real fue in-place, ver `MIGRA_PENCA_MULTIP.md`.
 
 ### Modelo conceptual
 

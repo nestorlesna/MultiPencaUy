@@ -14,7 +14,7 @@
 | 4 · Motor de cálculo | 🟡 SQL escrito junto al schema — sin probar contra datos reales |
 | 5 · Administración | 🟡 admin operativo (plataforma/tenant/Ten-Comp/resultados); falta CRUD competencias (wizard) |
 | 6 · Integración y pulido | ⬜ |
-| 7 · Migración de datos | 🟡 script + guía listos; ejecución post-Mundial |
+| 7 · Migración de datos | ✅ ejecutada en producción 21/07/2026, in-place (ver `docs/MIGRA_PENCA_MULTIP.md`) |
 | 8 · QA, seguridad y lanzamiento | ⬜ |
 
 **Próximo paso recomendado:** wizard de CRUD de competencias (Fase 5, único bloqueador para

@@ -471,14 +471,15 @@ desconectó el repo viejo, el deployment anterior sigue existiendo y es promovib
 - [ ] Monitorear 48 h: logs de Vercel (funciones `send-email` / `admin-reset-password`),
       logs de Postgres, reportes de usuarios.
 - [ ] **APK Android**: el APK viejo tiene la web v1 embebida (Capacitor empaqueta `dist`) y
-      dejará de funcionar contra la DB migrada. Compilar y distribuir el APK nuevo
-      (ver `docs/descarga_apk.md`); mismo `appId` ⇒ actualiza sobre el instalado.
+      dejará de funcionar contra la DB migrada. Compilar y distribuir el APK nuevo con
+      `scripts/release.ps1` (ya corregido para apuntar a este repo y a `PencaLes.apk`);
+      mismo `appId` ⇒ actualiza sobre el instalado.
 - [ ] Archivar el repo GitHub **Penca2026uy** (Settings → Archive) — ya taggeado en 1c.
 - [ ] Vercel viejo de MultiPenca dev: renombrarlo como staging explícito y dejar documentado
       el flujo: *toda migración SQL nueva se aplica primero en staging, después en prod*.
 - [ ] Restaurar en staging una base de trabajo (puede quedar la foto de prod migrada del
       ensayo de la Fase 3 — es el mejor staging posible).
-- [ ] Actualizar `CLAUDE.md` y `docs/PLAN_MULTITENANT.md`: la migración está hecha; marcar
+- [x] Actualizar `CLAUDE.md` y `docs/PLAN_MULTITENANT.md`: la migración está hecha; marcar
       `docs/MIGRACION_V1_A_V2.md` como histórico/no ejecutado (la dirección real fue in-place).
 - [ ] Anunciar a los usuarios las pencas nuevas (tab Correos → invitaciones ya migradas 😉).
 - [ ] **Recién a las 2–4 semanas**, con todo estable:
@@ -486,7 +487,8 @@ desconectó el repo viejo, el deployment anterior sigue existiendo y es promovib
       DROP SCHEMA legacy CASCADE;
       ```
       y borrar el trigger/función huérfanos si quedara alguno. Sin apuro: `legacy` no
-      interfiere ni es visible desde la API.
+      interfiere ni es visible desde la API. Mientras tanto, los backups locales en
+      `Datos/` (fuera de git, ver `.gitignore`) son la red de seguridad — plan Free sin PITR.
 
 ---
 
@@ -532,15 +534,23 @@ Colisiones conocidas y ya resueltas en el plan:
 
 ## Apéndice C — Checklist ejecutiva del día D
 
-- [ ] Backups Fase 1 hechos y verificados (prod_full.dump + avatares + env vars)
-- [ ] Ensayo en staging (Fase 3) pasó con leaderboard-diff = 0
-- [ ] `main` tiene el CSP con el ref de prod y build verde
-- [ ] Env vars precargadas en Vercel prod (incl. `VITE_V2_ENABLED=true`)
-- [ ] `mover_a_legacy.sql` ejecutado — public vacío, legacy con v1
-- [ ] Migraciones 01→04, 90, 91→111 aplicadas sin error
-- [ ] `rebuild_progress('2222…')` ejecutado
-- [ ] Validación 5a (conteos) y 5b (leaderboard fila a fila = 0 diferencias)
-- [ ] Smoke test 5c con cuentas reales
-- [ ] Vercel: repo → MultiPencaUy, deploy en el dominio, smoke test + correo + reset pass
-- [ ] Templates de email de Auth actualizados
-- [ ] Rollback NO necesario → tag `migracion-completada` en el repo
+- [x] Backups Fase 1 hechos y verificados (prod_full.dump + avatares + env vars)
+- [x] Ensayo en staging (Fase 3) pasó con leaderboard-diff = 0
+- [x] `main` tiene el CSP con el ref de prod y build verde
+- [x] Env vars precargadas en Vercel prod (incl. `VITE_V2_ENABLED=true`)
+- [x] `mover_a_legacy.sql` ejecutado — public vacío, legacy con v1
+- [x] Migraciones 01→04, 90, 91→111 aplicadas sin error
+- [x] `rebuild_progress('2222…')` ejecutado
+- [x] Validación 5a (conteos) y 5b (leaderboard fila a fila = 0 diferencias)
+- [x] Smoke test 5c con cuentas reales
+- [x] Vercel: repo → MultiPencaUy, deploy en el dominio, smoke test + correo + reset pass
+- [x] Templates de email de Auth actualizados
+- [x] Rollback NO necesario → tag `migracion-completada` en el repo
+
+**Ejecutado:** 21/07/2026. Hallazgos post-D-Day (no cubiertos por el ensayo de staging, quedan
+para el próximo ensayo): el CSP (`vercel.json`) también necesitaba el dominio de los escudos de
+Apertura/Intermedio (`estadisticas.tenfield.com.uy`) en `img-src` — bloqueado en prod porque
+`vite dev` local no aplica el header y el ensayo de staging tampoco lo hace vía CLI. Y el pipeline
+de release de APK (`scripts/release.ps1`, `.github/workflows/release-apk.yml`, `build.gradle`,
+`useUpdateCheck.ts`, `DescargarAppPage.tsx`) seguía todo apuntando al repo viejo `Penca2026uy` —
+se corrigió a `MultiPencaUy` / `PencaLes.apk`.

@@ -1,5 +1,10 @@
 # Migración PencaLes 2026 (v1) → PencaLes 2.0 (v2)
 
+> **⚠️ HISTÓRICO / NO EJECUTADO.** Este documento planteaba un ETL hacia un proyecto Supabase
+> **nuevo**. La migración real (21/07/2026) se hizo **in-place** sobre el proyecto de prod
+> existente — ver [`docs/MIGRA_PENCA_MULTIP.md`](MIGRA_PENCA_MULTIP.md), que es la que se
+> ejecutó de verdad. Se deja este archivo solo como referencia de la estrategia descartada.
+
 > **Cuándo:** después del 19/07/2026, con el Mundial terminado y la penca v1 congelada.
 > **Quién:** operador con acceso de owner a ambos proyectos Supabase.
 > **Duración estimada:** 1–2 horas + validación.
