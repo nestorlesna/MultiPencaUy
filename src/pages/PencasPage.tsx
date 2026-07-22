@@ -157,7 +157,11 @@ export function PencasPage() {
         ) : (
           <div className="space-y-5">
             {myPublic.length > 0 && (
-              <PencaGroup icon={<Globe size={14} className="text-text-secondary" />} title="Públicas">
+              <PencaGroup
+                icon={<Globe size={14} className="text-text-secondary" />}
+                title="Públicas"
+                subtitle="Pencas públicas a las que ya estás asociado"
+              >
                 {myPublic.map(p => <MyPencaCard key={p.tenComp.id} penca={p} />)}
               </PencaGroup>
             )}
@@ -186,10 +190,11 @@ export function PencasPage() {
 
       {/* Explorar públicas */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-1">
           <Globe size={16} className="text-text-secondary" />
           <h2 className="text-sm font-semibold text-text-secondary">Pencas públicas</h2>
         </div>
+        <p className="text-xs text-text-muted mb-3">Pencas públicas a las que todavía no estás asociado</p>
         {loadingPublic ? (
           <Spinner />
         ) : explorable.length === 0 ? (
@@ -247,13 +252,24 @@ export function PencasPage() {
   )
 }
 
-function PencaGroup({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+function PencaGroup({
+  icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: React.ReactNode
+  title: string
+  subtitle?: string
+  children: React.ReactNode
+}) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-2">
+      <div className="flex items-center gap-1.5 mb-0.5">
         {icon}
         <h3 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">{title}</h3>
       </div>
+      {subtitle && <p className="text-xs text-text-muted mb-2">{subtitle}</p>}
       <div className="grid sm:grid-cols-2 gap-3">{children}</div>
     </div>
   )
