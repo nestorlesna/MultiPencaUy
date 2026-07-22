@@ -14,6 +14,8 @@ Se identificó **1 hallazgo de severidad alta** (escalación de privilegios en e
 
 **Estado general: sin hallazgos críticos explotables por un atacante anónimo. Sí hay una vía real de escalación de privilegios para un rol ya autenticado (tenant-admin) y dependencias de producción desactualizadas que conviene resolver antes de crecer el número de tenants.**
 
+**Actualización 22/07/2026 — los 4 hallazgos quedaron resueltos**, incluyendo el despliegue en producción de la migración de base de datos (Hallazgo 2). Ver el estado detallado en cada sección y la tabla de prioridades (§5).
+
 ---
 
 ## 2. Hallazgos
@@ -85,6 +87,7 @@ Alternativa más simple y más segura: restringir el reset por tenant-admin a ta
 **Severidad:** MEDIA
 **Tipo:** Broken Access Control / inconsistencia de diseño
 **Confirmado:** Sí, por lectura de la política RLS (`02_rls.sql:210-211`). No explotado en vivo porque en producción las 4 pencas existentes son públicas (`Content-Range: 0-0/4`, ninguna `visibility=private` todavía).
+**Estado:** ✅ **RESUELTO** (22/07/2026), opción 1. Migración `112_join_code_column_grant.sql`: `REVOKE SELECT (join_code) ON ten_comps FROM authenticated` + RPC `admin_get_tenant_join_codes(p_tenant)` (`SECURITY DEFINER`, guardada por `is_tenant_admin`) para reponer la única lectura legítima que dependía del `SELECT` directo (`fetchTenantTenComps` en `src/services/v2/adminService.ts`, usada por `/t/:slug/admin`). Verificado con `tsc` que nada más en el frontend seleccionaba `join_code` fuera de las RPC ya existentes (`admin_get_ten_comp_join_code` en `emailService.ts`). **Migración aplicada en producción el 22/07/2026** (corrida manualmente por el usuario vía SQL Editor de Supabase) — el `REVOKE` y la RPC ya están activos en `twdruhhhnsbrpyzlfxmg`.
 
 #### Descripción
 
@@ -126,6 +129,7 @@ La opción 1 es más simple y no rompe el modelo de RLS existente.
 
 **Severidad:** BAJA (falla en modo seguro — no es explotable, es un bug funcional)
 **Confirmado:** Sí, `01_schema.sql:19-27` solo define `is_super_admin`, no `is_admin`.
+**Estado:** ✅ **RESUELTO** (22/07/2026). Reemplazado `is_admin` → `is_super_admin` en las tres funciones (`api/football-data.ts`, `api/api-football.ts`, `api/sportsdb.ts`). Verificado con `tsc`.
 
 #### Descripción
 
@@ -151,6 +155,7 @@ if (!profile?.is_super_admin) return res.status(403).json({ error: 'No autorizad
 ### HALLAZGO 4 — Dependencias de producción con vulnerabilidades conocidas
 
 **Severidad:** ALTA para `react-router-dom` (paquete de producción), MEDIA para `nodemailer` (solo `api/send-email.ts`, superficie acotada), BAJA para el resto (herramientas de build, no llegan al navegador)
+**Estado:** ✅ **RESUELTO** (22/07/2026) para las dependencias de producción. `npm audit fix` subió `react-router-dom`/`react-router` a `7.18.1` dentro del mismo rango `^7.13.2` de `package.json` (sin cambios de API, no se usan `loader`/`action`). `nodemailer` requería salto de major para salir del rango vulnerable (`<=9.0.0`); se instaló `^9.0.3` — API de `createTransport`/`sendMail` usada en `api/send-email.ts` sin cambios, tipos ahora vienen del propio paquete (se puede desinstalar `@types/nodemailer`, ya sin versión 9.x). Verificado con `tsc -b && vite build` y `npm audit --omit=dev` → **0 vulnerabilidades** en dependencias de producción. Quedan pendientes `tar`/`ws`/`brace-expansion`/`@xmldom/xmldom`/`undici`/`uuid`, todas transitivas de devDependencies (Capacitor, `@vercel/node`) — fuera del bundle servido al navegador, ver ítem 6 de la tabla de prioridades.
 
 `npm audit` sobre dependencias de producción:
 
@@ -203,9 +208,9 @@ Revisar el changelog de React Router 7.15→actual por breaking changes en `load
 |---|---|---|---|
 | 1 | ✅ **HECHO** — Cerrar escalación de privilegios en `admin-reset-password.ts` (Hallazgo 1) | **Ya** | 20 min |
 | 2 | ✅ **HECHO** — `.env` corregido y verificado en Vercel: `SUPABASE_SERVICE_ROLE_KEY` de prod pertenece al mismo proyecto que `SUPABASE_URL` (nota §4) | **Ya** | 5 min |
-| 3 | `REVOKE SELECT (join_code)` y validar que nada del frontend dependía del `select('*')` (Hallazgo 2) | Esta semana | 30 min |
-| 4 | Actualizar `react-router-dom`/`react-router` y `nodemailer`, correr `npm audit fix`, rebuild y smoke test de rutas | Esta semana | 45 min |
-| 5 | Arreglar `profiles.is_admin` → `is_super_admin` en las 3 funciones de fútbol externo (Hallazgo 3) | Próximo deploy | 10 min |
+| 3 | ✅ **HECHO** — `REVOKE SELECT (join_code)` + RPC `admin_get_tenant_join_codes` (Hallazgo 2); migración `112` aplicada en producción | Esta semana | 30 min |
+| 4 | ✅ **HECHO** — Actualizado `react-router-dom`/`react-router` (7.18.1) y `nodemailer` (^9.0.3), `npm audit fix`, `tsc -b && vite build` OK (Hallazgo 4) | Esta semana | 45 min |
+| 5 | ✅ **HECHO** — `profiles.is_admin` → `is_super_admin` en las 3 funciones de fútbol externo (Hallazgo 3) | Próximo deploy | 10 min |
 | 6 | (Opcional, bajo impacto) Actualizar `tar`/`ws`/`brace-expansion`/`xmldom` de devDependencies | Cuando convenga | 15 min |
 
 ---

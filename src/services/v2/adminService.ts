@@ -240,17 +240,24 @@ export interface TenantTenComp extends TenComp {
 }
 
 export async function fetchTenantTenComps(tenantId: string): Promise<TenantTenComp[]> {
-  const { data, error } = await supabase
-    .from('ten_comps')
-    .select(
-      `id, tenant_id, competition_id, name, slug, visibility, status, menu_config,
-       bonus_enabled, join_code,
-       competition:competition_id ( name ),
-       members:ten_comp_members ( status )`
-    )
-    .eq('tenant_id', tenantId)
-    .order('name')
+  const [{ data, error }, { data: codesData, error: codesError }] = await Promise.all([
+    supabase
+      .from('ten_comps')
+      .select(
+        `id, tenant_id, competition_id, name, slug, visibility, status, menu_config,
+         bonus_enabled,
+         competition:competition_id ( name ),
+         members:ten_comp_members ( status )`
+      )
+      .eq('tenant_id', tenantId)
+      .order('name'),
+    supabase.rpc('admin_get_tenant_join_codes', { p_tenant: tenantId }),
+  ])
   if (error) throw error
+  if (codesError) throw codesError
+  const codeByTenComp = new Map<string, string | null>(
+    (codesData ?? []).map((r: { ten_comp_id: string; join_code: string | null }) => [r.ten_comp_id, r.join_code])
+  )
   return (data ?? []).map((tc: any): TenantTenComp => {
     const members: { status: string }[] = tc.members ?? []
     return {
@@ -263,7 +270,7 @@ export async function fetchTenantTenComps(tenantId: string): Promise<TenantTenCo
       status: tc.status,
       menu_config: tc.menu_config ?? {},
       bonus_enabled: tc.bonus_enabled,
-      join_code: tc.join_code ?? null,
+      join_code: codeByTenComp.get(tc.id) ?? null,
       competition_name: tc.competition?.name ?? '',
       member_count: members.filter(m => m.status !== 'blocked').length,
       pending_count: members.filter(m => m.status === 'pending').length,

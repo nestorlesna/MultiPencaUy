@@ -19,11 +19,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('is_admin')
+    .select('is_super_admin')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.is_admin) return res.status(403).json({ error: 'No autorizado' })
+  if (!profile?.is_super_admin) return res.status(403).json({ error: 'No autorizado' })
 
   const { path, ...rest } = req.query as Record<string, string>
   if (!path) return res.status(400).json({ error: 'Falta el parámetro path' })
