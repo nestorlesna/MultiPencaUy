@@ -433,6 +433,7 @@ function ConfigTab() {
   const qc = useQueryClient()
   const { tenComp } = useTenComp()
   const [status, setStatus] = useState(tenComp.status)
+  const [name, setName] = useState(tenComp.name)
 
   const mut = useMutation({
     mutationFn: () => updateTenComp(tenComp.id, { status }),
@@ -443,8 +444,37 @@ function ConfigTab() {
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const nameMut = useMutation({
+    mutationFn: () => updateTenComp(tenComp.id, { name: name.trim() }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ten_comp'] })
+      toast.success('Nombre actualizado')
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   return (
     <div className="space-y-6">
+      <Section title="Nombre de la penca">
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            maxLength={100}
+          />
+          {name.trim() && name.trim() !== tenComp.name && (
+            <button
+              onClick={() => nameMut.mutate()}
+              disabled={nameMut.isPending}
+              className="btn-primary text-sm px-4"
+            >
+              {nameMut.isPending ? 'Guardando...' : 'Guardar'}
+            </button>
+          )}
+        </div>
+      </Section>
+
       {tenComp.visibility === 'private' && (
         <Section title="Código de invitación">
           <JoinCode slug={tenComp.slug} />
