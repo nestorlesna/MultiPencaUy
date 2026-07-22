@@ -1,7 +1,7 @@
 {
-  "version_code": 59,
-  "version_name": "1.2.2",
-  "apk_url": "https://github.com/nestorlesna/MultiPencaUy/releases/download/v1.2.2/PencaLes.apk",
-  "release_notes": "Migracion a produccion multi-tenant + fixes de CSP y pipeline de release",
+  "version_code": 60,
+  "version_name": "1.2.3",
+  "apk_url": "https://github.com/nestorlesna/MultiPencaUy/releases/download/v1.2.3/PencaLes.apk",
+  "release_notes": "Fix pipeline de release APK (keystore nuevo)",
   "force_update": false
 }
