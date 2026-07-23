@@ -240,7 +240,7 @@ export interface TenantTenComp extends TenComp {
 }
 
 export async function fetchTenantTenComps(tenantId: string): Promise<TenantTenComp[]> {
-  const [{ data, error }, { data: codesData, error: codesError }] = await Promise.all([
+  const [{ data, error }, codesRes] = await Promise.all([
     supabase
       .from('ten_comps')
       .select(
@@ -251,12 +251,14 @@ export async function fetchTenantTenComps(tenantId: string): Promise<TenantTenCo
       )
       .eq('tenant_id', tenantId)
       .order('name'),
+    // El código de invitación es un dato secundario (solo pencas privadas):
+    // si esta RPC falla no debe tumbar el listado completo de pencas.
     supabase.rpc('admin_get_tenant_join_codes', { p_tenant: tenantId }),
   ])
   if (error) throw error
-  if (codesError) throw codesError
+  if (codesRes.error) console.error('admin_get_tenant_join_codes', codesRes.error)
   const codeByTenComp = new Map<string, string | null>(
-    (codesData ?? []).map((r: { ten_comp_id: string; join_code: string | null }) => [r.ten_comp_id, r.join_code])
+    (codesRes.data ?? []).map((r: { ten_comp_id: string; join_code: string | null }) => [r.ten_comp_id, r.join_code])
   )
   return (data ?? []).map((tc: any): TenantTenComp => {
     const members: { status: string }[] = tc.members ?? []
