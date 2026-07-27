@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Loader2, Mail, Send, Trash2, CheckCircle2, XCircle, Clock,
   ChevronDown, ChevronUp, RefreshCw, AlertTriangle, Trophy, Swords, Bell, Eye, X,
-  UserPlus, AtSign,
+  UserPlus, AtSign, PenLine,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
@@ -162,6 +162,35 @@ export function CorreosTab({ tenCompId, tenantId, competitionId, brand }: Props)
             body_html: buildResultadoEmail(brand, nameOf(uid), uid, info, preds, leaderboard.slice(0, 5)),
             category: `partido_M${match.match_number}`,
           })))
+        }}
+        pending={enqueueMut.isPending}
+      />
+
+      {/* ── Correo personalizado (miembros + externos, HTML propio) ── */}
+      <CorreoPersonalizadoSection
+        recipients={recipients}
+        optedOut={optedOutMembers}
+        nameOf={nameOf}
+        onEnqueue={({ uids, emails, subject, html }) => {
+          const entries: CreateEmailInput[] = [
+            ...uids.map(uid => ({
+              ...baseEntry(uid),
+              subject,
+              body_html: html,
+              category: 'personalizado',
+            })),
+            ...emails.map(em => ({
+              tenant_id: tenantId,
+              ten_comp_id: tenCompId,
+              to_email: em,
+              to_name: em.split('@')[0],
+              user_id: null,
+              subject,
+              body_html: html,
+              category: 'personalizado',
+            })),
+          ]
+          enqueueMut.mutate(entries)
         }}
         pending={enqueueMut.isPending}
       />
@@ -493,6 +522,88 @@ function InvitarExternosSection({ joinCode, onEnqueue, pending }: {
       </div>
       <EnqueueButton count={valid.length} pending={pending} label="Agregar a la cola" icon={AtSign}
         onClick={() => { onEnqueue(valid); setRaw('') }} />
+    </Section>
+  )
+}
+
+// Correo con contenido propio (HTML pegado por el admin) a miembros registrados
+// de esta penca y/o a emails externos sueltos, separados por coma.
+function CorreoPersonalizadoSection({ recipients, optedOut, nameOf, onEnqueue, pending }: {
+  recipients: Member[]; optedOut: Set<string>; nameOf: (uid: string) => string
+  onEnqueue: (input: { uids: string[]; emails: string[]; subject: string; html: string }) => void
+  pending: boolean
+}) {
+  const { selected, setSelected, toggle, clear } = useSelection()
+  const [subject, setSubject] = useState('')
+  const [html, setHtml] = useState('')
+  const [externosRaw, setExternosRaw] = useState('')
+  const disabled = optedOut
+  const excluded = recipients.filter(m => optedOut.has(m.user_id)).length
+  const [respect, setRespect] = useState(true)
+  const effectiveDisabled = respect ? disabled : new Set<string>()
+
+  const parsedExternos = externosRaw.split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(Boolean)
+  const uniqueExternos = Array.from(new Set(parsedExternos))
+  const validExternos = uniqueExternos.filter(e => EMAIL_RE.test(e))
+  const invalidExternos = uniqueExternos.filter(e => !EMAIL_RE.test(e))
+
+  const total = selected.size + validExternos.length
+  const canSend = total > 0 && subject.trim().length > 0 && html.trim().length > 0
+
+  return (
+    <Section icon={PenLine} title="Correo personalizado" color="text-accent">
+      <p className="text-xs text-text-muted">
+        Elegí destinatarios entre los miembros de esta penca y/o pegá emails externos
+        (separados por coma), escribí el asunto y pegá el HTML del correo.
+      </p>
+
+      <input
+        value={subject}
+        onChange={e => setSubject(e.target.value)}
+        placeholder="Asunto del correo"
+        className="input w-full text-sm"
+      />
+
+      <textarea
+        value={html}
+        onChange={e => setHtml(e.target.value)}
+        rows={6}
+        placeholder="Pegá acá el HTML del correo…"
+        className="input w-full text-sm font-mono"
+      />
+
+      <div>
+        <p className="text-xs text-text-secondary font-medium mb-2">Miembros de la penca</p>
+        <RespectNewsToggle respect={respect} setRespect={setRespect} excluded={excluded} />
+        <Picker recipients={recipients} nameOf={nameOf} disabledIds={effectiveDisabled} optedOutIds={optedOut}
+          selected={selected} toggle={toggle}
+          selectAll={() => setSelected(new Set(recipients.filter(m => !effectiveDisabled.has(m.user_id)).map(m => m.user_id)))}
+          clear={clear} />
+      </div>
+
+      <div>
+        <p className="text-xs text-text-secondary font-medium mb-2">Emails externos (no registrados)</p>
+        <textarea
+          value={externosRaw}
+          onChange={e => setExternosRaw(e.target.value)}
+          rows={3}
+          placeholder="ana@mail.com, juan@mail.com…"
+          className="input w-full text-sm font-mono"
+        />
+        <div className="flex items-center gap-3 text-xs flex-wrap mt-1.5">
+          {validExternos.length > 0 && <span className="text-primary">{validExternos.length} válidos</span>}
+          {invalidExternos.length > 0 && <span className="text-error">{invalidExternos.length} inválidos: {invalidExternos.slice(0, 3).join(', ')}{invalidExternos.length > 3 ? '…' : ''}</span>}
+        </div>
+      </div>
+
+      <EnqueueButton count={canSend ? total : 0} pending={pending} label="Agregar a la cola" icon={PenLine}
+        onClick={() => {
+          onEnqueue({ uids: [...selected], emails: validExternos, subject: subject.trim(), html })
+          clear()
+          setSubject('')
+          setHtml('')
+          setExternosRaw('')
+        }} />
     </Section>
   )
 }
