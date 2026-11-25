@@ -40,3 +40,6 @@ Datos/
 *.sw?
 .vercel
 .env*
+
+# Backups de base de datos
+supabase/bakup_bd/
